@@ -9,4 +9,6 @@ edition = "2018"
 name = "lib"
 path = "src/lib.rs"
 
+
 [dependencies]
+ctrlc = { version = "3.0", features = ["termination"] }

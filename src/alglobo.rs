@@ -2,6 +2,7 @@ use crate::service_kind::{ServiceKind, kind_address};
 use std::net::{TcpStream};
 use std::io::Write;
 
+
 pub struct Alglobo {
     host: String,
     port: i32,
@@ -25,6 +26,8 @@ impl Alglobo {
         let mut bank_stream = TcpStream::connect(bank_address).unwrap();*/
 
         //parsear archivo transacciones
-        hotel_stream.write_all("AlGobo".as_bytes());
+        hotel_stream.write_all("AlGobo1\n".as_bytes());
+        hotel_stream.write_all("AlGobo2\n".as_bytes());
+        hotel_stream.write_all("AlGobo3\n".as_bytes());
     }
 }

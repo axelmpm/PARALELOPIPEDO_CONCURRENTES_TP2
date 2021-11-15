@@ -7,9 +7,12 @@ use std::env;
 use crate::service_kind::ServiceKind;
 use crate::service::Service;
 use crate::alglobo::Alglobo;
+use std::sync::Arc;
+
 
 
 pub fn run() {
+
     println!("Hello, world!");
 
     let args: Vec<String> = env::args().collect();
@@ -23,7 +26,18 @@ pub fn run() {
             Alglobo::new(host, port).run();
         }
         "service" => {
-            Service::new(ServiceKind::Hotel).run();
+            
+            let service = Arc::new(Service::new(ServiceKind::Hotel));
+            let service_clone = service.clone();
+
+            ctrlc::set_handler(move || {
+                println!("received Ctrl+C!");
+                service_clone.close();
+            })
+            .expect("Error setting Ctrl-C handler");
+
+            service.run();
+
         }
         _ => {}
     }
