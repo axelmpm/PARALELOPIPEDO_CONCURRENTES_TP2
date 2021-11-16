@@ -8,6 +8,10 @@ use std::io::Write;
 use std::thread::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+extern crate rand;
+use crate::service::rand::Rng;
+use core::time::Duration;
+
 
 pub struct Service {
     kind: ServiceKind,
@@ -22,8 +26,8 @@ impl Service {
         return Service{kind, listener: TcpListener::bind(address).unwrap(), closed: AtomicBool::new(false)};
     }
 
-    pub fn close(&self) {
-        //self.closed.store(true, Ordering::Relaxed);
+    pub fn close(& self) {
+        self.closed.store(true, Ordering::Relaxed);
     }
 
     pub fn run(&self) {
@@ -68,7 +72,8 @@ impl Service {
                     let mut stream = stream.try_clone().expect("could not clone stream");
                     buffer_line_threads.push(thread::spawn(move ||{
                         
-                        //thread sleep random
+                        
+                        thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(500..2000)));
                         
                         println!("Hello {}", buffer);
                         stream.write_all(format!("SUCCESS {}", buffer).as_bytes());
