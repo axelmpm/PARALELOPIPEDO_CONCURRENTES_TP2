@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Copy, Clone)]
 pub enum ServiceKind {
     Hotel,
@@ -19,5 +21,15 @@ pub fn kind_address(kind: ServiceKind) -> i32 {
         ServiceKind::Hotel => 8001,
         ServiceKind::Airline => 8002,
         ServiceKind::Bank => 8003,
+    }
+}
+
+impl fmt::Display for ServiceKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            ServiceKind::Hotel => "hotel",
+            ServiceKind::Airline => "airline",
+            ServiceKind::Bank => "bank",
+        })
     }
 }

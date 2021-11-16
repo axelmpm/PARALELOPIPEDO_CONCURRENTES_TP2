@@ -1,11 +1,12 @@
 
 use crate::service_kind::{ServiceKind, parse_kind};
+use std::fmt;
 
 pub struct TransactionStep {
-    id: i32,
-    service: ServiceKind,
-    amount: i32,
-    total: i32,
+    pub id: i32,
+    pub service: ServiceKind,
+    pub amount: i32,
+    pub total: i32,
 }
 
 impl TransactionStep {
@@ -27,4 +28,10 @@ pub fn transaction_parser(line: String) -> TransactionStep {
     let amount = params[2].parse::<i32>().unwrap();
     let total = params[3].parse::<i32>().unwrap();
     return TransactionStep::new(id, service, amount, total);
+}
+
+impl fmt::Display for TransactionStep {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+      write!(f, "{},{},{},{}", self.id, self.service, self.amount, self.total)
+  }
 }
