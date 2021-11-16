@@ -48,5 +48,5 @@ impl Processor {
         
         println!("Hello {}", buffer);
         stream.write_all(format!("SUCCESS {}", buffer).as_bytes());
-    } 
+    }
 }
