@@ -1,21 +1,19 @@
 use crate::service_kind::{ServiceKind, kind_address};
+use crate::processor::Processor;
 
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufRead, BufReader};
 use std::io::ErrorKind::WouldBlock;
 use std::thread;
-use std::io::Write;
 use std::thread::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-extern crate rand;
-use crate::service::rand::Rng;
-use core::time::Duration;
+use std::sync::Arc;
 
 
 pub struct Service {
     kind: ServiceKind,
     listener: TcpListener,
+    processor: Arc<Processor>,
     closed: AtomicBool
 }
 
@@ -23,7 +21,11 @@ impl Service {
 
     pub fn new(kind: ServiceKind) -> Service{
         let address = format!("localhost:{}", kind_address(kind));
-        return Service{kind, listener: TcpListener::bind(address).unwrap(), closed: AtomicBool::new(false)};
+        return Service{
+            kind,
+            listener: TcpListener::bind(address).unwrap(), 
+            processor: Arc::new(Processor::new()),
+            closed: AtomicBool::new(false)};
     }
 
     pub fn close(& self) {
@@ -62,6 +64,7 @@ impl Service {
         println!("new connection");
         let mut reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
 
+        let processor = self.processor.clone();
         return thread::spawn(move || {
 
             let mut buffer_line_threads = vec![];
@@ -69,15 +72,13 @@ impl Service {
                 let mut buffer = String::new();
                 reader.read_line(&mut buffer);
                 if buffer.len() > 0 {
-                    let mut stream = stream.try_clone().expect("could not clone stream");
+                    let stream = stream.try_clone().expect("could not clone stream");
+                    let processor = processor.clone();
+
                     buffer_line_threads.push(thread::spawn(move ||{
-                        
-                        
-                        thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(500..2000)));
-                        
-                        println!("Hello {}", buffer);
-                        stream.write_all(format!("SUCCESS {}", buffer).as_bytes());
+                      processor.process(buffer, stream);
                     }));
+                    
                 } else {
                     println!("Goodbye!");
                     break;

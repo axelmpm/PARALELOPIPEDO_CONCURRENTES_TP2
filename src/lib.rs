@@ -1,6 +1,10 @@
 pub mod service;
 pub mod service_kind;
 pub mod alglobo;
+pub mod pending_storage;
+pub mod message;
+pub mod message_kind;
+pub mod processor;
 
 use std::env;
 
