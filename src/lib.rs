@@ -6,6 +6,7 @@ pub mod message;
 pub mod message_kind;
 pub mod processor;
 pub mod message_body;
+pub mod logger;
 
 use std::env;
 

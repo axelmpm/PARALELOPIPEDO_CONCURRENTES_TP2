@@ -24,7 +24,7 @@ impl Processor {
 
         let message = deserialize(buffer);
 
-        match message.message_kind.clone() {
+        match message.kind.clone() {
             MessageKind::Confirmation => {
                 // accept from pending storage
             },

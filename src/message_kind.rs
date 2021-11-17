@@ -1,3 +1,5 @@
+use std::fmt;
+
 
 #[derive(Copy, Clone)]
 pub enum MessageKind {
@@ -19,5 +21,15 @@ pub fn encode(msg: MessageKind) -> String {
         MessageKind::Confirmation => "confirmation".to_string() ,
         MessageKind::Rejection => "rejection".to_string() ,
         _ => "".to_string() ,
+    }
+}
+
+impl fmt::Display for MessageKind {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            MessageKind::Confirmation => "confirmation",
+            MessageKind::Rejection => "rejection",
+            MessageKind::Transaction => "transaction",
+        })
     }
 }
