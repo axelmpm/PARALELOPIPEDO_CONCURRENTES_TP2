@@ -5,7 +5,7 @@ pub mod pending_storage;
 pub mod message;
 pub mod message_kind;
 pub mod processor;
-pub mod transaction_step;
+pub mod message_body;
 
 use std::env;
 

@@ -1,5 +1,5 @@
 use crate::service_kind::{ServiceKind, kind_address};
-use crate::transaction_step::transaction_parser;
+use crate::message_body::body_parser;
 use crate::message::Message;
 use crate::message_kind::MessageKind;
 use std::net::{TcpStream};
@@ -44,9 +44,9 @@ impl Alglobo {
         let reader = BufReader::new(file);
 
         for line in reader.lines().flatten() {
-
-            let transaction_step = transaction_parser(line);
-            hotel_stream.write_all(Message::new(MessageKind::Transaction, transaction_step).serialize().as_bytes());
+            println!("linea print {}", line);
+            let body = body_parser(line);
+            hotel_stream.write_all(Message::new(MessageKind::Transaction, body).serialize().as_bytes());
         }
 
         hotel_stream.write_all("AlGobo1\n".as_bytes());

@@ -1,6 +1,6 @@
 
 use crate::message_kind::MessageKind;
-use crate::message_kind::decode;
+use crate::message::{Message, deserialize};
 use crate::pending_storage::PendingStorage;
 
 extern crate rand;
@@ -21,7 +21,10 @@ impl Processor {
     }
 
     pub fn process(&self, buffer: String, mut stream: TcpStream){
-        match decode(buffer.clone()) {
+
+        let message = deserialize(buffer);
+
+        match message.message_kind.clone() {
             MessageKind::Confirmation => {
                 // accept from pending storage
             },
@@ -36,17 +39,13 @@ impl Processor {
                 if luck > 5 {
                     //accepted
                     println!("accepted!");
-                    stream.write_all(format!("REQUEST ACCETED {} REQUEST ID", buffer).as_bytes());
+                    stream.write_all(Message::new(MessageKind::Confirmation, message.body).serialize().as_bytes());
                 } else {
                     //rejected
                     println!("rejected!");
-                    stream.write_all(format!("REQUEST REJECTED {} REQUEST ID", buffer).as_bytes());
+                    stream.write_all(Message::new(MessageKind::Rejection, message.body).serialize().as_bytes());
                 }
             },
         }
-
-        
-        println!("Hello {}", buffer);
-        stream.write_all(format!("SUCCESS {}", buffer).as_bytes());
     }
 }
