@@ -43,9 +43,8 @@ impl Alglobo {
         
 
         for line in reader.lines().flatten() {
-            println!("linea print {}", line);
             let body = body_parser(line);
-            
+
             hotel_stream.write_all(Message::new(MessageKind::Transaction, body).serialize().as_bytes()); //TODO handelear error y reconectarse
             
             let mut buffer = String::new();
