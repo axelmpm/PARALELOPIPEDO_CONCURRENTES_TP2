@@ -7,7 +7,8 @@ use std::io::ErrorKind::WouldBlock;
 use std::thread;
 use std::thread::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, mpsc, Mutex};
+use std::sync::mpsc::Receiver;
 
 
 pub struct Service {
@@ -32,7 +33,7 @@ impl Service {
         self.closed.store(true, Ordering::Relaxed);
     }
 
-    pub fn run(&self) {
+    pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
 
         println!("Conectado");
         
@@ -41,11 +42,11 @@ impl Service {
         
         for stream in self.listener.incoming() {
             match stream {
-                Ok(stream) =>  streams_threads.push(self.handle_connection(stream)),
+                Ok(stream) =>  streams_threads.push(self.handle_connection(stream, ctrlc_event.clone())),
 
                 Err(ref e) if e.kind() == WouldBlock => {
-                    if self.closed.load(Ordering::Relaxed){
-                        break;
+                    if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                        break; 
                     }
                     continue;
                 },
@@ -60,7 +61,7 @@ impl Service {
         }
     }
 
-    fn handle_connection(&self, stream: TcpStream) -> JoinHandle<()>{
+    fn handle_connection(&self, stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>) -> JoinHandle<()>{
         println!("new connection");
         let mut reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
 
@@ -74,14 +75,14 @@ impl Service {
                 if buffer.len() > 0 {
                     let stream = stream.try_clone().expect("could not clone stream");
                     let processor = processor.clone();
-
+    
                     buffer_line_threads.push(thread::spawn(move ||{
                       processor.process(buffer, stream);
                     }));
-                    
-                } else {
-                    println!("Goodbye!");
-                    break;
+                }
+
+                if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                    break; 
                 }
             }
 

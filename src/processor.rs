@@ -39,10 +39,12 @@ impl Processor {
                 if luck > 5 {
                     //accepted
                     println!("accepted!");
+                    println!("PROCESSOR: message.body = {}", message.body);
                     stream.write_all(Message::new(MessageKind::Confirmation, message.body).serialize().as_bytes());
                 } else {
                     //rejected
                     println!("rejected!");
+                    println!("PROCESSOR: message.body = {}", message.body);
                     stream.write_all(Message::new(MessageKind::Rejection, message.body).serialize().as_bytes());
                 }
             },
