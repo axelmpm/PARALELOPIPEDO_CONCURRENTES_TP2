@@ -61,11 +61,17 @@ fn alglobo(){
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
+    let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
     
     println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
 
+    if !exit{
+        alglobo_retry_mode();
+    }
+}
 
+fn alglobo_retry_mode(){
+    let mut exit = false;
     let mut invalid_cmd = true;
     while !exit{
 
@@ -79,6 +85,8 @@ fn alglobo(){
         let mut buffer = String::new();
         let stdin = io::stdin(); // We get `Stdin` here.
         stdin.read_line(&mut buffer);
+
+        println!("{}",buffer);
 
         match buffer.to_uppercase().as_ref() {
             "X" => {
