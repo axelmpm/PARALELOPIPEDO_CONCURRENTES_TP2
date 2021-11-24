@@ -1,7 +1,9 @@
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::fs::File;
+use std::time::Instant;
 use crate::message_body::MessageBody;
+
 
 pub struct Logger {
     file: File,
@@ -10,7 +12,7 @@ pub struct Logger {
 impl Logger {
     pub fn new(log_file_name: String) -> Logger {
 
-        let mut file = OpenOptions::new()
+        let file = OpenOptions::new()
             .create(true)
             .write(true)
             .append(true)
@@ -22,8 +24,10 @@ impl Logger {
     pub fn log(&mut self, message_body: MessageBody) {
         writeln!(
             self.file,
-            "{}",
+            "{} :: {:?}",
             message_body,
+            Instant::now()
+
         )
         .expect("LOGGER: Couldn't log to file");
     }

@@ -2,6 +2,7 @@
 use crate::service_kind::{ServiceKind, parse_kind};
 use std::fmt;
 
+#[derive(Copy, Clone)]
 pub struct MessageBody {
     pub id: i32,
     pub service: ServiceKind,

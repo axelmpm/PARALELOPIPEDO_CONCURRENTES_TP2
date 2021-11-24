@@ -7,7 +7,7 @@ use std::io::ErrorKind::WouldBlock;
 use std::thread;
 use std::thread::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 
 

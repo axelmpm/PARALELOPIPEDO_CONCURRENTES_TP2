@@ -56,3 +56,39 @@
 2,bank,100,1
 3,hotel,5,3
 1,hotel,5,2
+2,bank,100,1
+1,hotel,5,2
+3,airline,10,3
+3,hotel,5,3
+1,bank,10,2 :: Instant { t: 227851.109008004s }
+3,hotel,5,3 :: Instant { t: 227851.263472732s }
+3,bank,7,3 :: Instant { t: 227851.683213831s }
+3,airline,10,3 :: Instant { t: 227851.862653772s }
+1,hotel,5,2 :: Instant { t: 227851.909499832s }
+1,hotel,5,2 :: Instant { t: 228059.967680222s }
+2,bank,100,1 :: Instant { t: 228060.533337233s }
+2,bank,100,1 :: Instant { t: 228169.272624357s }
+1,hotel,5,2 :: Instant { t: 228169.853791578s }
+1,bank,10,2 :: Instant { t: 228170.430377512s }
+3,airline,10,3 :: Instant { t: 228170.561069908s }
+3,bank,7,3 :: Instant { t: 228170.828849892s }
+3,bank,7,3 :: Instant { t: 228304.37859368s }
+1,bank,10,2 :: Instant { t: 228304.733771174s }
+1,hotel,5,2 :: Instant { t: 228305.503075972s }
+2,bank,100,1 :: Instant { t: 228353.920503335s }
+3,hotel,5,3 :: Instant { t: 228354.613615976s }
+3,bank,7,3 :: Instant { t: 228475.167325925s }
+1,hotel,5,2 :: Instant { t: 228475.341823989s }
+3,hotel,5,3 :: Instant { t: 228475.470326837s }
+1,bank,10,2 :: Instant { t: 228475.692757181s }
+3,airline,10,3 :: Instant { t: 228476.362304471s }
+2,bank,100,1 :: Instant { t: 228476.460800594s }
+1,bank,10,2 :: Instant { t: 228700.383595771s }
+1,hotel,5,2 :: Instant { t: 228700.411879938s }
+3,hotel,5,3 :: Instant { t: 228701.248088422s }
+2,bank,100,1 :: Instant { t: 228701.657711758s }
+3,hotel,5,3 :: Instant { t: 229263.936092916s }
+1,hotel,5,2 :: Instant { t: 229264.325774945s }
+2,bank,100,1 :: Instant { t: 229264.665261592s }
+1,bank,10,2 :: Instant { t: 229265.059776022s }
+3,bank,7,3 :: Instant { t: 229265.499525483s }
