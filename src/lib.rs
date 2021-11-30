@@ -7,6 +7,9 @@ pub mod message_kind;
 pub mod processor;
 pub mod message_body;
 pub mod logger;
+pub mod transaction_parser;
+pub mod operation;
+pub mod transaction;
 
 use std::env;
 
