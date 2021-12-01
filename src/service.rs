@@ -9,24 +9,28 @@ use std::thread::JoinHandle;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
-
+use crate::logger::Logger;
 
 pub struct Service {
     kind: ServiceKind,
     listener: TcpListener,
     processor: Arc<Processor>,
-    closed: AtomicBool
+    closed: AtomicBool,
+    logger: Arc<Mutex<Logger>>
 }
 
 impl Service {
 
     pub fn new(kind: ServiceKind) -> Service{
         let address = format!("localhost:{}", kind_address(kind));
+        let logger = Arc::new(Mutex::new(Logger::new(kind.to_string() + ".txt")));
         return Service{
             kind,
             listener: TcpListener::bind(address).unwrap(), 
-            processor: Arc::new(Processor::new()),
-            closed: AtomicBool::new(false)};
+            processor: Arc::new(Processor::new(logger.clone())),
+            closed: AtomicBool::new(false),
+            logger,
+        }
     }
 
     pub fn close(& self) {
