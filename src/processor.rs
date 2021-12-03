@@ -32,11 +32,13 @@ impl Processor {
         match message.kind.clone() {
             MessageKind::Confirmation => {
                 self.logger.lock().unwrap().write_line(format!("COMMIT {}", message.body.id.to_string()));
+                stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
                 // accept from pending storage
             },
 
             MessageKind::Rejection => {
                 self.logger.lock().unwrap().write_line(format!("ABORT {}", message.body.id.to_string()));
+                stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
                 // reject from pending storage
             },
 
