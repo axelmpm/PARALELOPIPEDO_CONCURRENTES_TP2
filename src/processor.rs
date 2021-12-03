@@ -30,18 +30,21 @@ impl Processor {
 
         let message = deserialize(buffer);
         match message.kind.clone() {
+            // Esto sería equivalente a un COMMIT
             MessageKind::Confirmation => {
                 self.logger.lock().unwrap().write_line(format!("COMMIT {}", message.body.id.to_string()));
                 stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
                 // accept from pending storage
             },
 
+            // Esto seria equivalente a un ROLLBACK
             MessageKind::Rejection => {
                 self.logger.lock().unwrap().write_line(format!("ABORT {}", message.body.id.to_string()));
                 stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
                 // reject from pending storage
             },
 
+            // Esto seria equivalente a un PREPARE
             MessageKind::Transaction => {
                 thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(500..2000)));
                 let luck = rand::thread_rng().gen_range(0..10);
