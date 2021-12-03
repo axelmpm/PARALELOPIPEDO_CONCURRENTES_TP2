@@ -31,4 +31,15 @@ impl Logger {
         )
         .expect("LOGGER: Couldn't log to file");
     }
+
+    pub fn write_line(&mut self, line: String) {
+        writeln!(
+            self.file,
+            "{} :: {:?}",
+            line,
+            Instant::now()
+
+        )
+        .expect("LOGGER: Couldn't log to file");
+    }
 }

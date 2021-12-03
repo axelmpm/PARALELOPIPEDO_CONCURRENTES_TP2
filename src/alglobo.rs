@@ -3,6 +3,7 @@ use crate::message_body::{body_parser, MessageBody};
 use crate::message::{Message, deserialize};
 use crate::message_kind::MessageKind;
 use crate::logger::Logger;
+use crate::transaction_parser::TransactionParser;
 use std::net::{TcpStream};
 use std::io::Write;
 use std::fs::File;
@@ -18,7 +19,7 @@ use std::collections::HashMap;
 pub struct Alglobo {
     host: String,
     port: i32,
-    hotel_stream: TcpStream,
+    service_streams: HashMap<ServiceKind, TcpStream>,
     failed_transactions: Arc<Mutex<HashMap<i32, VecDeque<MessageBody>>>>,
 }
 
@@ -26,8 +27,15 @@ impl Alglobo {
 
     pub fn new(host: String, port: i32) -> Self {
         let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
-        let hotel_stream = TcpStream::connect(hotel_address).unwrap();
-        return Alglobo{host, port, hotel_stream, failed_transactions: Arc::new(Mutex::new(HashMap::new()))};
+        let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
+        let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
+
+        let mut service_streams = HashMap::new();
+        service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
+        service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
+        service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
+        
+        return Alglobo{host, port, service_streams, failed_transactions: Arc::new(Mutex::new(HashMap::new()))};
     }
 
     pub fn retry(&self, id: i32) {
@@ -43,7 +51,7 @@ impl Alglobo {
 
         let failed_transactions = self.failed_transactions.clone();
 
-        let mut hotel_reader = BufReader::new(self.hotel_stream.try_clone().expect("could not clone stream"));
+        // let mut hotel_reader = BufReader::new(self.hotel_stream.try_clone().expect("could not clone stream"));
         /*
         let airline_address = format!("localhost:{}", kind_address(ServiceKind::Airline));
         let mut airline_stream = TcpStream::connect(airline_address).unwrap();
@@ -53,51 +61,104 @@ impl Alglobo {
 
         //parsear archivo transacciones
 
-        let file = File::open("transactions.txt").expect("Problem opening file");
+
+        let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
+
         let mut rejected = Logger::new("rejections.txt".to_owned());
         let mut accepted = Logger::new("accepted.txt".to_owned());
+        let mut transaction_log = Logger::new("transaction_log.txt".to_owned());
         
-        let reader = BufReader::new(file);
-
-        let incoming_message_listener_thread = thread::spawn(move || {
+        // let incoming_message_listener_thread = thread::spawn(move || {
             
-            loop {
+        //     loop {
+        //         let mut buffer = String::new();
+        //         hotel_reader.read_line(&mut buffer); //is blocking unless connection down!!!
+        //         if buffer.len() > 0 {
+        //             let incoming_message = deserialize(buffer);
+    
+        //             match incoming_message.kind.clone() {
+        //                 MessageKind::Confirmation => {
+        //                     accepted.log(incoming_message.body);
+        //                 },
+            
+        //                 MessageKind::Rejection => {
+        //                     failed_transactions.lock().unwrap().entry(incoming_message.body.id.clone()).or_insert_with(|| VecDeque::new()).push_back(incoming_message.body.clone());
+        //                     rejected.log(incoming_message.body);
+        //                 },
+            
+        //                 _ => {},
+        //             }
+        //         } else {
+        //             break; // conection down. Stops listening messages
+        //         } 
+
+        //         if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+        //             *ctrlc_pressed_copy.lock().unwrap() = true;
+        //             break;
+        //         }
+        //     }
+        // });
+
+        while let Some(transaction) = transaction_parser.read_transaction() {
+
+            let mut responses = vec![];
+            transaction_log.write_line(format!("INIT {}", transaction.id));
+            for operation in &transaction.operations {
+                let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
+                let message = Message::new(MessageKind::Transaction, body);
+                let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
+                service_stream.write_all(message.serialize().as_bytes()).unwrap();
+
+                let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
                 let mut buffer = String::new();
-                hotel_reader.read_line(&mut buffer); //is blocking unless connection down!!!
+                reader.read_line(&mut buffer).unwrap();
+
                 if buffer.len() > 0 {
                     let incoming_message = deserialize(buffer);
-    
-                    match incoming_message.kind.clone() {
-                        MessageKind::Confirmation => {
-                            accepted.log(incoming_message.body);
-                        },
-            
-                        MessageKind::Rejection => {
-                            failed_transactions.lock().unwrap().entry(incoming_message.body.id.clone()).or_insert_with(|| VecDeque::new()).push_back(incoming_message.body.clone());
-                            rejected.log(incoming_message.body);
-                        },
-            
-                        _ => {},
-                    }
-                } else {
-                    break; // conection down. Stops listening messages
-                } 
-
-                if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
-                    *ctrlc_pressed_copy.lock().unwrap() = true;
-                    break;
+                    responses.push(incoming_message.kind);
                 }
             }
-        });
 
-        for line in reader.lines().flatten() {
-        
-            let body = body_parser(line);
-            println!("body = {}", body);
-            self.hotel_stream.write_all(Message::new(MessageKind::Transaction, body).serialize().as_bytes()); //TODO handelear error y reconectarse
+            if responses.contains(&MessageKind::Rejection) {
+                transaction_log.write_line(format!("ABORT {}", transaction.id));
+                let mut acks = vec![];
+                for operation in &transaction.operations {
+                    let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
+                    let message = Message::new(MessageKind::Rejection, body);
+                    let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
+                    service_stream.write_all(message.serialize().as_bytes()).unwrap();
+    
+                    let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
+                    let mut buffer = String::new();
+                    reader.read_line(&mut buffer).unwrap();
+    
+                    if buffer.len() > 0 {
+                        let incoming_message = deserialize(buffer);
+                        acks.push(incoming_message.kind);
+                    }
+                }
+            } else {
+                transaction_log.write_line(format!("COMMIT {}", transaction.id));
+                let mut acks = vec![];
+                for operation in &transaction.operations {
+                    let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
+                    let message = Message::new(MessageKind::Confirmation, body);
+                    let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
+                    service_stream.write_all(message.serialize().as_bytes()).unwrap();
+    
+                    let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
+                    let mut buffer = String::new();
+                    reader.read_line(&mut buffer).unwrap();
+    
+                    if buffer.len() > 0 {
+                        let incoming_message = deserialize(buffer);
+                        acks.push(incoming_message.kind);
+                    }
+                }
+            }
         }
 
-        incoming_message_listener_thread.join();
+        // incoming_message_listener_thread.join();
 
         return *ctrlc_pressed.lock().unwrap();
     }

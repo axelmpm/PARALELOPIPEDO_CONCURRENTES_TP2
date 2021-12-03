@@ -7,6 +7,9 @@ pub mod message_kind;
 pub mod processor;
 pub mod message_body;
 pub mod logger;
+pub mod transaction_parser;
+pub mod operation;
+pub mod transaction;
 
 use std::env;
 
@@ -27,14 +30,14 @@ pub fn run() {
 
     match param.as_ref() {
         "alglobo" => alglobo(),
-        "service" => service(),
-        _ => {}
+        _ => service(param.clone()),
+        // _ => {}
     }
 }
 
-fn service(){
+fn service(kind: String){
             
-    let service = Arc::new(Service::new(ServiceKind::Hotel));
+    let service = Arc::new(Service::new(service_kind::parse_kind(kind).unwrap()));
     let (sender, receiver) = mpsc::channel();
 
     ctrlc::set_handler(move || {
