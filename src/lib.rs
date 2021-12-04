@@ -10,6 +10,7 @@ pub mod logger;
 pub mod transaction_parser;
 pub mod operation;
 pub mod transaction;
+pub mod scrum_master;
 
 use std::env;
 
@@ -30,8 +31,8 @@ pub fn run() {
 
     match param.as_ref() {
         "alglobo" => alglobo(),
-        _ => service(param.clone()),
-        // _ => {}
+        "service" => service(param.clone()),
+        _ => println!("invalid start mode")
     }
 }
 
@@ -65,8 +66,6 @@ fn alglobo(){
     .expect("Error setting Ctrl-C handler");
 
     let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
-    
-    println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
 
     if !exit{
         alglobo_retry_mode();
@@ -76,6 +75,7 @@ fn alglobo(){
 fn alglobo_retry_mode(){
     let mut exit = false;
     let mut invalid_cmd = true;
+    //println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
     while !exit{
 
         if invalid_cmd{
