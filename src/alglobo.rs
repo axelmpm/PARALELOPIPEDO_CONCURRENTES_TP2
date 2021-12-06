@@ -14,6 +14,8 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::collections::VecDeque;
 use std::collections::HashMap;
+use crate::transaction::Transaction;
+use crate::leader_election::LeaderElection;
 
 
 pub struct Alglobo {
@@ -99,68 +101,58 @@ impl Alglobo {
         //     }
         // });
 
+        let leader_election = LeaderElection::new(0); //todo get id from somewhere
+        let leader_thread = thread::spawn(move || {
+            loop {
+                leader_election.work();
+                //todo check and keep cycling while not ctrlc
+            }
+        });
+
         while let Some(transaction) = transaction_parser.read_transaction() {
 
+            let transaction = Arc::new(transaction);
             let mut responses = vec![];
             transaction_log.write_line(format!("INIT {}", transaction.id));
-            for operation in &transaction.operations {
-                let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
-                let message = Message::new(MessageKind::Transaction, body);
-                let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
-                service_stream.write_all(message.serialize().as_bytes()).unwrap();
-
-                let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
-                let mut buffer = String::new();
-                reader.read_line(&mut buffer).unwrap();
-
-                if buffer.len() > 0 {
-                    let incoming_message = deserialize(buffer);
-                    responses.push(incoming_message.kind);
-                }
-            }
+            self.process_operations(transaction.clone(), MessageKind::Transaction, responses);
 
             if responses.contains(&MessageKind::Rejection) {
                 transaction_log.write_line(format!("ABORT {}", transaction.id));
                 let mut acks = vec![];
-                for operation in &transaction.operations {
-                    let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
-                    let message = Message::new(MessageKind::Rejection, body);
-                    let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
-                    service_stream.write_all(message.serialize().as_bytes()).unwrap();
-    
-                    let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
-                    let mut buffer = String::new();
-                    reader.read_line(&mut buffer).unwrap();
-    
-                    if buffer.len() > 0 {
-                        let incoming_message = deserialize(buffer);
-                        acks.push(incoming_message.kind);
-                    }
-                }
+                self.process_operations(transaction, MessageKind::Rejection, acks);
             } else {
                 transaction_log.write_line(format!("COMMIT {}", transaction.id));
                 let mut acks = vec![];
-                for operation in &transaction.operations {
-                    let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
-                    let message = Message::new(MessageKind::Confirmation, body);
-                    let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
-                    service_stream.write_all(message.serialize().as_bytes()).unwrap();
-    
-                    let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
-                    let mut buffer = String::new();
-                    reader.read_line(&mut buffer).unwrap();
-    
-                    if buffer.len() > 0 {
-                        let incoming_message = deserialize(buffer);
-                        acks.push(incoming_message.kind);
-                    }
-                }
+                self.process_operations(transaction, MessageKind::Confirmation, acks);
+            }
+
+            if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                *ctrlc_pressed_copy.lock().unwrap() = true;
+                break;
             }
         }
 
         // incoming_message_listener_thread.join();
 
         return *ctrlc_pressed.lock().unwrap();
+    }
+
+    fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind, &mut loglist: Vec<MessageKind>){
+        for operation in &transaction.operations {
+            let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
+            let message = Message::new(kind, body);
+            let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
+            service_stream.write_all(message.serialize().as_bytes()).unwrap();
+
+            let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
+            let mut buffer = String::new();
+            reader.read_line(&mut buffer).unwrap();
+
+            if buffer.len() > 0 {
+                let incoming_message = deserialize(buffer);
+                loglist.push(incoming_message.kind);
+            }
+        }
     }
 }
 

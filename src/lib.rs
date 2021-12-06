@@ -10,7 +10,7 @@ pub mod logger;
 pub mod transaction_parser;
 pub mod operation;
 pub mod transaction;
-pub mod scrum_master;
+pub mod leader_election;
 
 use std::env;
 
