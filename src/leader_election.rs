@@ -6,7 +6,6 @@ use std::convert::TryInto;
 use std::mem::size_of;
 
 pub const N_NODES: u32 = 1;
-const BASE_PORT: u32 = 30000;
 const TIME: u64 = 1500;
 const TIMEOUT: Some<Duration> = Some(Duration::from_millis(TIMEOUT));
 
@@ -21,7 +20,7 @@ pub struct LeaderElection{
 
 impl LeaderElection {
     pub fn new(id: u32) -> LeaderElection {
-        addr = format!("127.0.0.1:{}",BASE_PORT + id);
+        addr = format!("127.0.0.1:{}", id);
         sock = UdpSocket::bind(addr).expect("could not create socket");
         sock.set_read_timeout(TIMEOUT);
         return LeaderElection{
@@ -75,7 +74,7 @@ impl LeaderElection {
             self.sock.set_read_timeout(None);
         } else {
             self.sock.set_read_timeout(TIMEOUT);
-            self.sock.send_to(format!("P{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", BASE_PORT + lid))
+            self.sock.send_to(format!("P{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", lid))
         }
 
         let mut buf = [0; size_of::<u32>() + 1];
@@ -130,13 +129,13 @@ impl LeaderElection {
 
     fn send_leader_proclamation(&self){//todo change strings into structs
         for i in 0..N_NODES { //broadcast to all
-            self.sock.send_to(format!("L-{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", BASE_PORT + i));
+            self.sock.send_to(format!("L-{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", i));
         }
     }
 
     fn send_election(&self){
         for i in (self.id+1)..N_NODES {//broadcast to bigger numbers
-                self.sock.send_to(format!("E{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", BASE_PORT + i));
+                self.sock.send_to(format!("E{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", i));
             }
         }
     }

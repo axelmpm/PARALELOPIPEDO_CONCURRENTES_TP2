@@ -101,7 +101,7 @@ impl Alglobo {
         //     }
         // });
 
-        let leader_election = Arc::new(LeaderElection::new(0)); //todo get id from somewhere
+        let leader_election = Arc::new(LeaderElection::new(self.port as u32)); //todo get id from somewhere
         let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || {
             loop {
