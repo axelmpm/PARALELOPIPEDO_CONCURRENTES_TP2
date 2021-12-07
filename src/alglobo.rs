@@ -101,34 +101,42 @@ impl Alglobo {
         //     }
         // });
 
-        let leader_election = LeaderElection::new(0); //todo get id from somewhere
+        let leader_election = Arc::new(LeaderElection::new(0)); //todo get id from somewhere
+        let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || {
             loop {
-                leader_election.work();
+                leader_clone.work();
                 //todo check and keep cycling while not ctrlc
             }
         });
 
-        while let Some(transaction) = transaction_parser.read_transaction() {
+        loop {
+            if !leader_election.am_i_leader() {
 
-            let transaction = Arc::new(transaction);
-            let mut responses = vec![];
-            transaction_log.write_line(format!("INIT {}", transaction.id));
-            self.process_operations(transaction.clone(), MessageKind::Transaction, responses);
+                leader_election.wait_until_leader_changes();
 
-            if responses.contains(&MessageKind::Rejection) {
-                transaction_log.write_line(format!("ABORT {}", transaction.id));
-                let mut acks = vec![];
-                self.process_operations(transaction, MessageKind::Rejection, acks);
-            } else {
-                transaction_log.write_line(format!("COMMIT {}", transaction.id));
-                let mut acks = vec![];
-                self.process_operations(transaction, MessageKind::Confirmation, acks);
-            }
+            } else if let Some(transaction) = transaction_parser.read_transaction() {
 
-            if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
-                *ctrlc_pressed_copy.lock().unwrap() = true;
-                break;
+                let transaction = Arc::new(transaction);
+                let mut responses = vec![];
+                transaction_log.write_line(format!("INIT {}", transaction.id));
+                self.process_operations(transaction.clone(), MessageKind::Transaction, responses);
+
+                if responses.contains(&MessageKind::Rejection) {
+                    transaction_log.write_line(format!("ABORT {}", transaction.id));
+                    let mut acks = vec![];
+                    self.process_operations(transaction, MessageKind::Rejection, acks);
+                } else {
+                    transaction_log.write_line(format!("COMMIT {}", transaction.id));
+                    let mut acks = vec![];
+                    self.process_operations(transaction, MessageKind::Confirmation, acks);
+                }
+
+                if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                    *ctrlc_pressed_copy.lock().unwrap() = true;
+                    break;
+                }
+
             }
         }
 

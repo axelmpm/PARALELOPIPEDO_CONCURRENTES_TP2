@@ -3,6 +3,7 @@ use std::sync::{Mutex, Arc, Condvar};
 use std::time::Duration;
 use std::thread;
 use std::convert::TryInto;
+use std::mem::size_of;
 
 pub const N_NODES: u32 = 1;
 const BASE_PORT: u32 = 30000;
@@ -14,7 +15,8 @@ pub struct LeaderElection{
     sock: UdpSocket,
     current_leader: Arc<(Mutex<Option<u32>>, Condvar)>,
     electing: Arc<Mutex<bool>>,
-    got_ok: Arc<(Mutex<bool>, Condvar::new())>
+    got_ok: Arc<(Mutex<bool>, Condvar::new())>,
+    leader_changed: Arc<(Mutex<bool>, Condvar::new())>
 }
 
 impl LeaderElection {
@@ -28,6 +30,7 @@ impl LeaderElection {
             current_leader: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             electing: Arc::new(Mutex::new(false)),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
+            leader_changed: Arc::new((Mutex::new(false), Condvar::new()))
         }
     }
 
@@ -37,7 +40,8 @@ impl LeaderElection {
             sock: self.sock.try_clone().unwrap(),
             current_leader: self.current_leader.clone(),
             electing: self.electing.clone(),
-            got_ok: self.got_ok.clone()
+            got_ok: self.got_ok.clone(),
+            leader_changed: self.leader_changed.clone()
         }
     }
 
@@ -65,17 +69,18 @@ impl LeaderElection {
     }
 
     pub fn work(&self){
-        //self.set_nonblocking(true).expect("could not set non-blocking");
 
-        if (self.id == get_leader_id) {
+        let lid = get_leader_id(&self);
+        if lid == self.id {
             self.sock.set_read_timeout(None);
         } else {
             self.sock.set_read_timeout(TIMEOUT);
+            self.sock.send_to(format!("P{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", BASE_PORT + lid))
         }
 
-        let mut buf = String::new();
+        let mut buf = [0; size_of::<u32>() + 1];
         if let Ok((size, from)) = self.sock.recv_from(&mut buf) {
-            self.process_message(amt, buf, src);
+            self.process_message(amt, buf[0],u32::from_le_bytes(buf[1..].try_into().unwrap()), src);
         } else {
             //timeout
             self.elect_new_leader();
@@ -83,14 +88,24 @@ impl LeaderElection {
 
     }
 
+    pub fn am_i_leader(&self)->bool {
+        self.get_leader_id() == self.id
+    }
+
+    pub fn wait_until_leader_changes(&self){
+         self.leader_changed.1.wait_timeout_while(self.leader_changed.0.lock().unwrap(), |changed| !*changed );
+        *self.leader_changed.0.lock().unwrap() = false;
+    }
+
     fn get_leader_id(&self) -> u32 {
         self.current_leader.1.wait_while(self.current_leader.0.lock().unwrap(), |leader_id| leader_id.is_none()).unwrap().unwrap()
     }
 
-    fn process_message(&self, amt: usize, buf: String, src: String) {
-        let id_from = u32::from_le_bytes(buf[1..].try_into().unwrap());
-        match &buf[0] {
-            b'P' => {self.sock.send_to(format!("P{}", self.id).as_ref(),src);}, // ping
+    fn process_message(&self, amt: usize, msg: u8, id_from:u32, src: String) {
+        match msg {
+            b'P' => {
+                self.sock.send_to(format!("R{}", self.id).as_ref(),src);// response to ping
+            },
             b'E' => {//call to elections
                 if self.id >= id_from { return }
 
@@ -106,6 +121,8 @@ impl LeaderElection {
             b'O' => {
                 *self.got_ok.0.lock().unwrap() = true;
                 self.got_ok.1.notify_all();
+                *self.leader_changed.0.lock().unwrap() = true;
+                self.leader_changed.1.notify_all();
             },//update OK condvar
             _ => {}
         }
