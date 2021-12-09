@@ -1,0 +1,6 @@
+INIT 1 :: Instant { t: 14138.21006802s }
+ABORT 1 :: Instant { t: 14140.722951886s }
+INIT 2 :: Instant { t: 14140.727607786s }
+ABORT 2 :: Instant { t: 14141.941880451s }
+INIT 3 :: Instant { t: 14141.944205835s }
+ABORT 3 :: Instant { t: 14146.103098299s }

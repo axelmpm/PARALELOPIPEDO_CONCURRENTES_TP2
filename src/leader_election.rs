@@ -4,24 +4,25 @@ use std::time::Duration;
 use std::thread;
 use std::convert::TryInto;
 use std::mem::size_of;
+use std::net::SocketAddr;
 
 pub const N_NODES: u32 = 1;
 const TIME: u64 = 1500;
-const TIMEOUT: Some<Duration> = Some(Duration::from_millis(TIMEOUT));
+const TIMEOUT: Option<Duration> = Some(Duration::from_millis(TIME));
 
 pub struct LeaderElection{
     id: u32,
     sock: UdpSocket,
     current_leader: Arc<(Mutex<Option<u32>>, Condvar)>,
     electing: Arc<Mutex<bool>>,
-    got_ok: Arc<(Mutex<bool>, Condvar::new())>,
-    leader_changed: Arc<(Mutex<bool>, Condvar::new())>
+    got_ok: Arc<(Mutex<bool>, Condvar)>,
+    leader_changed: Arc<(Mutex<bool>, Condvar)>
 }
 
 impl LeaderElection {
     pub fn new(id: u32) -> LeaderElection {
-        addr = format!("127.0.0.1:{}", id);
-        sock = UdpSocket::bind(addr).expect("could not create socket");
+        let addr = format!("127.0.0.1:{}", id);
+        let sock = UdpSocket::bind(addr).expect("could not create socket");
         sock.set_read_timeout(TIMEOUT);
         return LeaderElection{
             id,
@@ -45,8 +46,8 @@ impl LeaderElection {
     }
 
     pub fn elect_new_leader(&self){
-        let electing = self.electing.lock().unwrap();
-        if electing {
+        let mut electing = self.electing.lock().unwrap();
+        if *electing {
             return;
         }
         *electing = true;
@@ -54,7 +55,7 @@ impl LeaderElection {
 
         self.send_election();
 
-        let got_ok = self.got_ok.1.wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT, |got_it| !*got_it );
+        let got_ok = self.got_ok.1.wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT.unwrap(), |got_it| !*got_it );
         if *got_ok.unwrap().0 {
             //if recv ok then wait to recv new leader id
             self.current_leader.1.wait_while(self.current_leader.0.lock().unwrap(), |leader_id| leader_id.is_none() );
@@ -62,29 +63,26 @@ impl LeaderElection {
             //if no ok arrived then proclaim myself as leader
             self.send_leader_proclamation();
         }
-
-
-
     }
 
     pub fn work(&self){
 
-        let lid = get_leader_id(&self);
+        let lid = self.get_leader_id();
         if lid == self.id {
             self.sock.set_read_timeout(None);
         } else {
+            let addr = format!("127.0.0.1:{}", lid);
             self.sock.set_read_timeout(TIMEOUT);
-            self.sock.send_to(format!("P{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", lid))
+            self.sock.send_to(format!("P{}", self.id).as_ref(), addr);
         }
-
+    
         let mut buf = [0; size_of::<u32>() + 1];
         if let Ok((size, from)) = self.sock.recv_from(&mut buf) {
-            self.process_message(amt, buf[0],u32::from_le_bytes(buf[1..].try_into().unwrap()), src);
+            self.process_message(buf[0],u32::from_le_bytes(buf[1..].try_into().unwrap()), from);
         } else {
             //timeout
             self.elect_new_leader();
         }
-
     }
 
     pub fn am_i_leader(&self)->bool {
@@ -92,7 +90,7 @@ impl LeaderElection {
     }
 
     pub fn wait_until_leader_changes(&self){
-         self.leader_changed.1.wait_timeout_while(self.leader_changed.0.lock().unwrap(), |changed| !*changed );
+         self.leader_changed.1.wait_timeout_while(self.leader_changed.0.lock().unwrap(), TIMEOUT.unwrap(), |changed| !*changed );
         *self.leader_changed.0.lock().unwrap() = false;
     }
 
@@ -100,7 +98,7 @@ impl LeaderElection {
         self.current_leader.1.wait_while(self.current_leader.0.lock().unwrap(), |leader_id| leader_id.is_none()).unwrap().unwrap()
     }
 
-    fn process_message(&self, amt: usize, msg: u8, id_from:u32, src: String) {
+    fn process_message(&self, msg: u8, id_from:u32, src: SocketAddr) {
         match msg {
             b'P' => {
                 self.sock.send_to(format!("R{}", self.id).as_ref(),src);// response to ping
@@ -129,14 +127,15 @@ impl LeaderElection {
 
     fn send_leader_proclamation(&self){//todo change strings into structs
         for i in 0..N_NODES { //broadcast to all
-            self.sock.send_to(format!("L-{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", i));
+            let addr  = format!("127.0.0.1:{}", i);
+            self.sock.send_to(format!("L-{}", self.id).as_ref(), addr);
         }
     }
 
     fn send_election(&self){
         for i in (self.id+1)..N_NODES {//broadcast to bigger numbers
-                self.sock.send_to(format!("E{}", self.id).as_ref(), addr = format!("127.0.0.1:{}", i));
-            }
+            let addr = format!("127.0.0.1:{}", i);
+            self.sock.send_to(format!("E{}", self.id).as_ref(), addr);
         }
     }
 }

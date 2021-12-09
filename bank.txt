@@ -1,0 +1,6 @@
+ACCEPTED 1 :: Instant { t: 14140.721700414s }
+ABORT 1 :: Instant { t: 14140.726432264s }
+REJECTED 2 :: Instant { t: 14141.940657375s }
+ABORT 2 :: Instant { t: 14141.943073078s }
+REJECTED 3 :: Instant { t: 14146.101889934s }
+ABORT 3 :: Instant { t: 14146.109230101s }

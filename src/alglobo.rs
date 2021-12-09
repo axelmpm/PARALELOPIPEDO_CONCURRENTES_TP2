@@ -1,12 +1,11 @@
 use crate::service_kind::{ServiceKind, kind_address};
-use crate::message_body::{body_parser, MessageBody};
+use crate::message_body::MessageBody;
 use crate::message::{Message, deserialize};
 use crate::message_kind::MessageKind;
 use crate::logger::Logger;
 use crate::transaction_parser::TransactionParser;
 use std::net::{TcpStream};
 use std::io::Write;
-use std::fs::File;
 use std::io::BufReader;
 use std::io::BufRead;
 use std::sync::{Arc, Mutex};
@@ -118,18 +117,15 @@ impl Alglobo {
             } else if let Some(transaction) = transaction_parser.read_transaction() {
 
                 let transaction = Arc::new(transaction);
-                let mut responses = vec![];
                 transaction_log.write_line(format!("INIT {}", transaction.id));
-                self.process_operations(transaction.clone(), MessageKind::Transaction, responses);
+                let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
 
                 if responses.contains(&MessageKind::Rejection) {
                     transaction_log.write_line(format!("ABORT {}", transaction.id));
-                    let mut acks = vec![];
-                    self.process_operations(transaction, MessageKind::Rejection, acks);
+                    self.process_operations(transaction, MessageKind::Rejection);
                 } else {
                     transaction_log.write_line(format!("COMMIT {}", transaction.id));
-                    let mut acks = vec![];
-                    self.process_operations(transaction, MessageKind::Confirmation, acks);
+                    self.process_operations(transaction, MessageKind::Confirmation);
                 }
 
                 if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
@@ -145,7 +141,9 @@ impl Alglobo {
         return *ctrlc_pressed.lock().unwrap();
     }
 
-    fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind, &mut loglist: Vec<MessageKind>){
+    fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind) -> Vec<MessageKind>{
+
+        let mut loglist = vec![];
         for operation in &transaction.operations {
             let body = MessageBody::new(transaction.id.parse::<i32>().unwrap(), operation.service, operation.amount as i32, 0);
             let message = Message::new(kind, body);
@@ -161,6 +159,7 @@ impl Alglobo {
                 loglist.push(incoming_message.kind);
             }
         }
+        return loglist;
     }
 }
 

@@ -1,0 +1,4 @@
+REJECTED 1 :: Instant { t: 14139.541058749s }
+ABORT 1 :: Instant { t: 14140.724199937s }
+REJECTED 3 :: Instant { t: 14143.501767387s }
+ABORT 3 :: Instant { t: 14146.104326165s }

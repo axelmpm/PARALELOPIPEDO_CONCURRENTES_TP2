@@ -14,7 +14,6 @@ pub mod leader_election;
 
 use std::env;
 
-use crate::service_kind::ServiceKind;
 use crate::service::Service;
 use crate::alglobo::Alglobo;
 use std::sync::{Arc, mpsc, Mutex};
@@ -24,14 +23,12 @@ use std::io;
 
 pub fn run() {
 
-    println!("Hello, world!");
-
     let args: Vec<String> = env::args().collect();
-    let param = &args[1];
+    let mode = &args[1];
 
-    match param.as_ref() {
+    match mode.as_ref() {
         "alglobo" => alglobo(),
-        "service" => service(param.clone()),
+        "service" => service(args[2].clone()),
         _ => println!("invalid start mode")
     }
 }
