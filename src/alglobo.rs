@@ -8,7 +8,7 @@ use std::net::{TcpStream};
 use std::io::Write;
 use std::io::BufReader;
 use std::io::BufRead;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, mpsc};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::collections::HashMap;
@@ -56,10 +56,13 @@ impl Alglobo {
 
         let leader_election = LeaderElection::new(self.port as u32); //todo get id from somewhere
         let leader_clone = leader_election.clone();
+        let (sender, receiver) = mpsc::channel();
         let leader_thread = thread::spawn(move || {
             loop {
                 leader_clone.work();
-                //todo check and keep cycling while not ctrlc
+                if receiver.try_recv().is_ok(){
+                    break;
+                }
             }
         });
 
@@ -85,6 +88,7 @@ impl Alglobo {
 
                 if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
                     *ctrlc_pressed_copy.lock().unwrap() = true;
+                    sender.send(true);
                     break;
                 }
             }
