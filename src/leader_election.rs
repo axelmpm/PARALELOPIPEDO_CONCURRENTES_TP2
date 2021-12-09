@@ -67,7 +67,7 @@ impl LeaderElection {
         let got_ok = self.got_ok.1.wait_timeout_while(self.got_ok.0.lock().unwrap(), TIMEOUT.unwrap(), |got_it| !*got_it );
         if *got_ok.unwrap().0 {
             //if recv ok then wait to recv new leader id
-            self.current_leader.1.wait_while(self.current_leader.0.lock().unwrap(), |leader_id| leader_id.is_none() );
+            self.current_leader.1.wait_while(self.current_leader.0.lock().unwrap(), |leader_id| leader_id.is_none() ); //TODO meter algun TIMEOUT grande (capaz?)
         } else {
             //if no ok arrived then proclaim myself as leader
             self.send_leader_proclamation();
