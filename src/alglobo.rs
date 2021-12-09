@@ -102,15 +102,7 @@ impl Alglobo {
 
         let leader_election = LeaderElection::new(self.port as u32); //todo get id from somewhere
         let leader_clone = leader_election.clone();
-        let (sender, receiver) = mpsc::channel();
-        let leader_thread = thread::spawn(move || {
-            loop {
-                leader_clone.work();
-                if receiver.try_recv().is_ok(){
-                    break;
-                }
-            }
-        });
+        let leader_thread = thread::spawn(move || leader_clone.work());
 
         loop {
             if !leader_election.am_i_leader() {
@@ -133,7 +125,7 @@ impl Alglobo {
 
                 if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
                     *ctrlc_pressed_copy.lock().unwrap() = true;
-                    sender.send(true);
+                    leader_election.close();
                     break;
                 }
 

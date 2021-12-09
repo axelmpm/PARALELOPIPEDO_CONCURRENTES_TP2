@@ -1,10 +1,11 @@
 use std::net::UdpSocket;
-use std::sync::{Mutex, Arc, Condvar};
+use std::sync::{Mutex, Arc, Condvar, mpsc};
 use std::time::Duration;
 use std::thread;
 use std::convert::TryInto;
 use std::mem::size_of;
 use std::net::SocketAddr;
+use std::sync::mpsc::{Sender, Receiver};
 
 pub const N_NODES: u32 = 1;
 const TIME: u64 = 1500;
@@ -16,7 +17,9 @@ pub struct LeaderElection{
     current_leader: Arc<(Mutex<Option<u32>>, Condvar)>,
     electing: Arc<Mutex<bool>>,
     got_ok: Arc<(Mutex<bool>, Condvar)>,
-    leader_changed: Arc<(Mutex<bool>, Condvar)>
+    leader_changed: Arc<(Mutex<bool>, Condvar)>,
+    finish_snd: Arc<Mutex<Sender<bool>>>,
+    finish_rcv: Arc<Mutex<Receiver<bool>>>
 }
 
 impl LeaderElection {
@@ -24,13 +27,17 @@ impl LeaderElection {
         let addr = format!("127.0.0.1:{}", id);
         let sock = UdpSocket::bind(addr).expect("could not create socket");
         sock.set_read_timeout(TIMEOUT);
+        let (sender, receiver) = mpsc::channel();
+
         return LeaderElection{
             id,
             sock,
             current_leader: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             electing: Arc::new(Mutex::new(false)),
             got_ok: Arc::new((Mutex::new(false), Condvar::new())),
-            leader_changed: Arc::new((Mutex::new(false), Condvar::new()))
+            leader_changed: Arc::new((Mutex::new(false), Condvar::new())),
+            finish_snd: Arc::new(Mutex::new(sender)),
+            finish_rcv: Arc::new(Mutex::new(receiver))
         }
     }
 
@@ -41,7 +48,9 @@ impl LeaderElection {
             current_leader: self.current_leader.clone(),
             electing: self.electing.clone(),
             got_ok: self.got_ok.clone(),
-            leader_changed: self.leader_changed.clone()
+            leader_changed: self.leader_changed.clone(),
+            finish_snd: self.finish_snd.clone(),
+            finish_rcv: self.finish_rcv.clone()
         }
     }
 
@@ -67,22 +76,33 @@ impl LeaderElection {
 
     pub fn work(&self){
 
-        let lid = self.get_leader_id();
-        if lid == self.id {
-            self.sock.set_read_timeout(None);
-        } else {
-            let addr = format!("127.0.0.1:{}", lid);
-            self.sock.set_read_timeout(TIMEOUT);
-            self.sock.send_to(format!("P{}", self.id).as_ref(), addr);
+        loop {
+            let lid = self.get_leader_id();
+            if lid == self.id {
+                self.sock.set_read_timeout(None);
+            } else {
+                let addr = format!("127.0.0.1:{}", lid);
+                self.sock.set_read_timeout(TIMEOUT);
+                self.sock.send_to(format!("P{}", self.id).as_ref(), addr);
+            }
+
+            let mut buf = [0; size_of::<u32>() + 1];
+            if let Ok((size, from)) = self.sock.recv_from(&mut buf) {
+                self.process_message(buf[0], u32::from_le_bytes(buf[1..].try_into().unwrap()), from);
+            } else {
+                //timeout
+                self.elect_new_leader();
+            }
+
+            if self.finish_rcv.lock().expect("failed to lock").try_recv().is_ok() {
+                break;
+            }
         }
-    
-        let mut buf = [0; size_of::<u32>() + 1];
-        if let Ok((size, from)) = self.sock.recv_from(&mut buf) {
-            self.process_message(buf[0],u32::from_le_bytes(buf[1..].try_into().unwrap()), from);
-        } else {
-            //timeout
-            self.elect_new_leader();
-        }
+    }
+
+    pub fn close(&self){
+        self.send_close();
+        self.finish_snd.lock().expect("could not lock").send(true);
     }
 
     pub fn am_i_leader(&self)->bool {
@@ -112,30 +132,49 @@ impl LeaderElection {
                     clone.elect_new_leader() );
             },
             b'L' => {
-                *self.current_leader.0.lock().unwrap() = Some(id_from);
-                self.current_leader.1.notify_all();
+                self.make_leader(id_from);
             },//update leader condvar and leader id value//new leader
             b'O' => {
                 *self.got_ok.0.lock().unwrap() = true;
                 self.got_ok.1.notify_all();
-                *self.leader_changed.0.lock().unwrap() = true;
-                self.leader_changed.1.notify_all();
             },//update OK condvar
+            b'X' => {
+                //close signal recv
+                self.finish_snd.lock().expect("could not lock").send(true);
+                self.make_leader(id_from);
+            }
             _ => {}
         }
     }
 
-    fn send_leader_proclamation(&self){//todo change strings into structs
-        for i in 0..N_NODES { //broadcast to all
-            let addr  = format!("127.0.0.1:{}", i);
-            self.sock.send_to(format!("L-{}", self.id).as_ref(), addr);
-        }
+    fn make_leader(&self, id_from: u32){
+        *self.current_leader.0.lock().unwrap() = Some(id_from);
+        self.current_leader.1.notify_all();
+        *self.leader_changed.0.lock().unwrap() = true;
+        self.leader_changed.1.notify_all();
+    }
+
+    fn send_leader_proclamation(&self){
+        self.send_all_but_self("L".parse().unwrap());
+    }
+
+    fn send_close(&self){
+        self.send_all_but_self("X".parse().unwrap());
     }
 
     fn send_election(&self){
         for i in (self.id+1)..N_NODES {//broadcast to bigger numbers
             let addr = format!("127.0.0.1:{}", i);
             self.sock.send_to(format!("E{}", self.id).as_ref(), addr);
+        }
+    }
+
+    fn send_all_but_self(&self, str: String){
+        for i in 0..N_NODES { //broadcast to all
+            if i != self.id {
+                let addr = format!("127.0.0.1:{}", i);
+                self.sock.send_to(format!("{}{}", str, self.id).as_ref(), addr);
+            }
         }
     }
 }
