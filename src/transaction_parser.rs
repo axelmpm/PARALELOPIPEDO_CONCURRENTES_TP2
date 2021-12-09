@@ -26,7 +26,7 @@ impl TransactionParser {
     if let Some(line) = self.lines.next() {
       operations.push(parse_operation(line.clone()));
       let s = line.split(',').collect::<Vec<&str>>();
-      transaction_id = s.first().unwrap().to_string();
+      transaction_id = s.first().unwrap().parse::<i32>().unwrap();
       total_operations = s.last().unwrap().parse::<i32>().unwrap();
     } else {
       return None
@@ -37,6 +37,6 @@ impl TransactionParser {
       operations.push(parse_operation(line));
     }
     
-    Some(Transaction::new(transaction_id.to_string(), operations))
+    Some(Transaction::new(transaction_id, operations))
   }
 }
