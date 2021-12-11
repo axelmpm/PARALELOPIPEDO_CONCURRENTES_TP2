@@ -38,12 +38,16 @@ impl Alglobo {
         return Alglobo{host, port, service_streams, failed_transactions: HashMap::new()};
     }
 
-    pub fn retry(&self, id: i32) {
+    pub fn retry(&self, id: i32) -> bool{
         if self.failed_transactions.contains_key(&id) {
             let transaction = self.failed_transactions.get(&id).unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR"));
+        } else {
+            return false;
         }
 
+        println!("do retry");
         // do retry TODO
+        return true;
     }
 
     pub fn process(&mut self, ctrlc_event: Arc<Mutex<Receiver<()>>>) -> bool{
@@ -113,8 +117,14 @@ impl Alglobo {
     }
 
     pub fn show_failed_transactions(&self){
-        for (key, value) in &self.failed_transactions{
-            println!("[TRANSCACTION {}] {}", key, value);
+
+        if self.failed_transactions.len() == 0 {
+            println!("no failed transactions");
+        } else {
+            
+            for (key, value) in &self.failed_transactions{
+                println!("[TRANSCACTION {}] {}", key, value);
+            }
         }
     }
 }

@@ -20,7 +20,6 @@ use std::sync::{Arc, mpsc, Mutex};
 use std::io;
 
 
-
 pub fn run() {
 
     let args: Vec<String> = env::args().collect();
@@ -70,28 +69,27 @@ fn alglobo(){
 
 fn alglobo_retry_mode(alglobo: Alglobo){
     let mut exit = false;
-    let mut invalid_cmd = true;
     println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
     while !exit{
 
-        if invalid_cmd{
-            println!("Press [F] to see all failed transactions");
-            println!("Press [R] to retry a failed transaction");
-            println!("Press [X] to exit");
-            invalid_cmd = false;
-        }
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        input = input.to_uppercase();
-
-        match input.chars().next().unwrap() {
+        println!("");
+        println!("==========================================");
+        println!("Press [F] to see all failed transactions");
+        println!("Press [R] to retry a failed transaction");
+        println!("Press [X] to exit");
+        
+        match  read_char_from_stdin().unwrap() {
             'F' => {
-                println!("tocaste la F!");
                 alglobo.show_failed_transactions();
             },
             'R' => {
-                println!("tocaste la R!");
+                println!("input id to retry");
+                let id = read_char_from_stdin().unwrap().to_digit(10).unwrap();
+                if alglobo.retry(id as i32) {
+                    println!("success in retry!");
+                } else {
+                    println!("id inputed not found");
+                }
             },
             'X' => {
                 println!("Goodbye!");
@@ -99,8 +97,15 @@ fn alglobo_retry_mode(alglobo: Alglobo){
             }
             _ => {
                 println!("Unknown command");
-                invalid_cmd = true;
             }
         }
     }
+}
+
+
+fn read_char_from_stdin() -> Option<char>{
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    input = input.to_uppercase();
+    return input.chars().next();
 }

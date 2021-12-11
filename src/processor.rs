@@ -48,7 +48,7 @@ impl Processor {
                 thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(500..2000)));
                 let luck = rand::thread_rng().gen_range(0..10);
                 self.storage.lock().unwrap().store(message.body.id.to_string());
-                if luck > 1 {
+                if luck > 2 {
                     //accepted
                     //println!("PROCESSOR: message.body = {}", message.body);
                     self.logger.lock().unwrap().write_line(format!("ACCEPTED {}", message.body.id.to_string()));
