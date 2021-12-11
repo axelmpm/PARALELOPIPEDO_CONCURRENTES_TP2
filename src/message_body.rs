@@ -24,7 +24,7 @@ impl MessageBody {
 pub fn body_parser(line: String) -> MessageBody {
 
     let params = line.split(',').collect::<Vec<&str>>();
-    println!("BODY PARSER: line = {}, params[0] = {}, params[1] = {}, params[2] = {}, params[3] = {}", line, params[0], params[1], params[2], params[3]);
+    //println!("BODY PARSER: line = {}, params[0] = {}, params[1] = {}, params[2] = {}, params[3] = {}", line, params[0], params[1], params[2], params[3]);
     let id = params[0].parse::<i32>().unwrap();
     let amount = params[2].parse::<i32>().unwrap();
     let total = params[3].parse::<i32>().unwrap();

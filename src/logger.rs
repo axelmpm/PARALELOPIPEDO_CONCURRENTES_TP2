@@ -41,5 +41,7 @@ impl Logger {
 
         )
         .expect("LOGGER: Couldn't log to file");
+
+        printnl!("{} ::", line);
     }
 }

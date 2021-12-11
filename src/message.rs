@@ -23,8 +23,8 @@ impl Message {
 pub fn deserialize(raw_message : String ) -> Message{
 
     let params = raw_message.split('|').collect::<Vec<&str>>();
-    println!("DESERIALIZE: raw_message = {}", raw_message);
-    println!("DESERIALIZE: params[0] = {}, params[1] = {}", params[0], params[1]);
+    //println!("DESERIALIZE: raw_message = {}", raw_message);
+    //println!("DESERIALIZE: params[0] = {}, params[1] = {}", params[0], params[1]);
     let body = body_parser(params[1].to_string());
     let kind = decode(params[0].to_string());
 

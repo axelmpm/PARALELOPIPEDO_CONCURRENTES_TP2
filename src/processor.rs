@@ -51,14 +51,12 @@ impl Processor {
                 self.storage.lock().unwrap().store(message.body.id.to_string());
                 if luck > 5 {
                     //accepted
-                    println!("accepted!");
-                    println!("PROCESSOR: message.body = {}", message.body);
+                    //println!("PROCESSOR: message.body = {}", message.body);
                     self.logger.lock().unwrap().write_line(format!("ACCEPTED {}", message.body.id.to_string()));
                     stream.write_all(Message::new(MessageKind::Confirmation, message.body).serialize().as_bytes()).unwrap();
                 } else {
                     //rejected
-                    println!("rejected!");
-                    println!("PROCESSOR: message.body = {}", message.body);
+                    //println!("PROCESSOR: message.body = {}", message.body);
                     self.logger.lock().unwrap().write_line(format!("REJECTED {}", message.body.id.to_string()));
                     stream.write_all(Message::new(MessageKind::Rejection, message.body).serialize().as_bytes()).unwrap();
                 }

@@ -2,3 +2,15 @@ REJECTED 1 :: Instant { t: 14139.541058749s }
 ABORT 1 :: Instant { t: 14140.724199937s }
 REJECTED 3 :: Instant { t: 14143.501767387s }
 ABORT 3 :: Instant { t: 14146.104326165s }
+REJECTED 1 :: Instant { t: 19918.177086704s }
+ABORT 1 :: Instant { t: 19918.742588501s }
+REJECTED 3 :: Instant { t: 19921.399200399s }
+ABORT 3 :: Instant { t: 19923.594466974s }
+REJECTED 1 :: Instant { t: 215394.239829106s }
+ABORT 1 :: Instant { t: 215395.593536157s }
+ACCEPTED 3 :: Instant { t: 215398.184282028s }
+ABORT 3 :: Instant { t: 215400.708430864s }
+REJECTED 1 :: Instant { t: 215693.07009755s }
+ABORT 1 :: Instant { t: 215693.694999107s }
+ACCEPTED 3 :: Instant { t: 215696.377070049s }
+ABORT 3 :: Instant { t: 215697.653865654s }

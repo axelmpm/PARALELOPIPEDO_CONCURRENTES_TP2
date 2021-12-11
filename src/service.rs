@@ -39,7 +39,7 @@ impl Service {
 
     pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
 
-        println!("Conectado");
+        println!("running service");
         
         self.listener.set_nonblocking(true).expect("Cannot set non-blocking");
         let mut streams_threads = vec![];

@@ -81,6 +81,7 @@ impl Alglobo {
                 if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
                     *ctrlc_pressed_copy.lock().unwrap() = true;
                     leader_election.close();
+                    println!("breaking loop because of ctrlc pressed");
                     break;
                 }
             }
