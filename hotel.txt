@@ -26,3 +26,7 @@ ACCEPTED 1 :: Instant { t: 229632.663246433s }
 ABORT 1 :: Instant { t: 229634.258441846s }
 ACCEPTED 3 :: Instant { t: 229636.12583895s }
 ABORT 3 :: Instant { t: 229637.760067574s }
+REJECTED 1 :: Instant { t: 232027.457300689s }
+ABORT 1 :: Instant { t: 232029.316815132s }
+ACCEPTED 3 :: Instant { t: 232032.190887232s }
+COMMIT 3 :: Instant { t: 232034.811376196s }

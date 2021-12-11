@@ -111,5 +111,11 @@ impl Alglobo {
         }
         return loglist;
     }
+
+    pub fn show_failed_transactions(&self){
+        for (key, value) in &self.failed_transactions{
+            println!("[TRANSCACTION {}] {}", key, value);
+        }
+    }
 }
 

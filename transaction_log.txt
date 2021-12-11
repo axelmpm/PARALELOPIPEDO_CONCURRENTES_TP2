@@ -40,3 +40,15 @@ INIT 2 :: Instant { t: 229634.259002572s }
 COMMIT 2 :: Instant { t: 229635.235127427s }
 INIT 3 :: Instant { t: 229635.235529069s }
 ABORT 3 :: Instant { t: 229637.759745302s }
+INIT 1 :: Instant { t: 232025.916881913s }
+ABORT 1 :: Instant { t: 232029.316648181s }
+INIT 2 :: Instant { t: 232029.317161694s }
+COMMIT 2 :: Instant { t: 232030.826729611s }
+INIT 3 :: Instant { t: 232030.827190781s }
+COMMIT 3 :: Instant { t: 232034.811220192s }
+INIT 1 :: Instant { t: 232115.915937335s }
+ABORT 1 :: Instant { t: 232117.070025706s }
+INIT 2 :: Instant { t: 232117.070611748s }
+COMMIT 2 :: Instant { t: 232117.935818293s }
+INIT 3 :: Instant { t: 232117.936491916s }
+ABORT 3 :: Instant { t: 232122.971922662s }

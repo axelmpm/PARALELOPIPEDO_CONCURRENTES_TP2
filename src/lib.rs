@@ -60,14 +60,15 @@ fn alglobo(){
     })
     .expect("Error setting Ctrl-C handler");
 
-    //let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
+    let mut alglobo = Alglobo::new("localhost".to_string(), 9000);
+    let exit = alglobo.process(Arc::new(Mutex::new(receiver)));
     let exit = false;
     if !exit{
-        alglobo_retry_mode();
+        alglobo_retry_mode(alglobo);
     }
 }
 
-fn alglobo_retry_mode(){
+fn alglobo_retry_mode(alglobo: Alglobo){
     let mut exit = false;
     let mut invalid_cmd = true;
     println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
@@ -85,6 +86,13 @@ fn alglobo_retry_mode(){
         input = input.to_uppercase();
 
         match input.chars().next().unwrap() {
+            'F' => {
+                println!("tocaste la F!");
+                alglobo.show_failed_transactions();
+            },
+            'R' => {
+                println!("tocaste la R!");
+            },
             'X' => {
                 println!("Goodbye!");
                 exit = true;
