@@ -61,13 +61,12 @@ fn alglobo(){
 
     let mut alglobo = Alglobo::new("localhost".to_string(), 9000);
     let exit = alglobo.process(Arc::new(Mutex::new(receiver)));
-    let exit = false;
     if !exit{
         alglobo_retry_mode(alglobo);
     }
 }
 
-fn alglobo_retry_mode(alglobo: Alglobo){
+fn alglobo_retry_mode(mut alglobo: Alglobo){
     let mut exit = false;
     println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
     while !exit{

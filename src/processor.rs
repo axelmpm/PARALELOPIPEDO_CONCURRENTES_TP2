@@ -1,6 +1,6 @@
 
 use crate::message_kind::MessageKind;
-use crate::message::{Message, deserialize};
+use crate::message::Message;
 use crate::pending_storage::PendingStorage;
 
 extern crate rand;
@@ -9,8 +9,6 @@ use crate::logger::{Logger};
 use std::thread;
 use std::sync::{Arc,Mutex};
 use core::time::Duration;
-use std::net::TcpStream;
-use std::io::Write;
 
 
 pub struct Processor {

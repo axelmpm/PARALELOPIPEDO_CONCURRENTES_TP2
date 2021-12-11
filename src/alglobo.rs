@@ -8,7 +8,7 @@ use std::net::{TcpStream};
 use std::io::Write;
 use std::io::BufReader;
 use std::io::BufRead;
-use std::sync::{Arc, Mutex, mpsc};
+use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use std::thread;
 use std::collections::HashMap;
@@ -21,6 +21,7 @@ pub struct Alglobo {
     port: i32,
     service_streams: HashMap<ServiceKind, TcpStream>,
     failed_transactions: HashMap<i32, Arc<Transaction>>,
+    transaction_log: Logger,
 }
 
 impl Alglobo {
@@ -34,19 +35,21 @@ impl Alglobo {
         service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
         service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
         service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
+
+        let transaction_log = Logger::new("transaction_log.txt".to_owned());
         
-        return Alglobo{host, port, service_streams, failed_transactions: HashMap::new()};
+        return Alglobo{host, port, service_streams, failed_transactions: HashMap::new(), transaction_log};
     }
 
-    pub fn retry(&self, id: i32) -> bool{
+    pub fn retry(&mut self, id: i32) -> bool{
         if self.failed_transactions.contains_key(&id) {
             let transaction = self.failed_transactions.get(&id).unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR"));
+            if self.process_transaction(transaction.clone()){
+                self.failed_transactions.remove_entry(&id).unwrap();
+            }
         } else {
             return false;
         }
-
-        println!("do retry");
-        // do retry TODO
         return true;
     }
 
@@ -56,7 +59,6 @@ impl Alglobo {
         let ctrlc_pressed_copy = ctrlc_pressed.clone();
 
         let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
-        let mut transaction_log = Logger::new("transaction_log.txt".to_owned());
 
         let leader_election = LeaderElection::new(self.port as u32); //todo get id from somewhere
         let leader_clone = leader_election.clone();
@@ -74,18 +76,7 @@ impl Alglobo {
 
             } else if let Some(transaction) = transaction_parser.read_transaction() {
 
-                let transaction = Arc::new(transaction);
-                transaction_log.write_line(format!("INIT {}", transaction.id));
-                let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
-
-                if responses.contains(&MessageKind::Rejection) {
-                    transaction_log.write_line(format!("ABORT {}", transaction.id));
-                    self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
-                    self.process_operations(transaction, MessageKind::Rejection);
-                } else {
-                    transaction_log.write_line(format!("COMMIT {}", transaction.id));
-                    self.process_operations(transaction, MessageKind::Confirmation);
-                }
+                self.process_transaction(Arc::new(transaction));
 
             } else{
                 break; // no more transacitions
@@ -93,6 +84,23 @@ impl Alglobo {
         }
         leader_election.close();
         return *ctrlc_pressed.lock().unwrap();
+    }
+
+    fn process_transaction(&mut self, transaction: Arc<Transaction>) -> bool{
+
+        self.transaction_log.write_line(format!("INIT {}", transaction.id));
+        let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
+
+        if responses.contains(&MessageKind::Rejection) {
+            self.transaction_log.write_line(format!("ABORT {}", transaction.id));
+            self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
+            self.process_operations(transaction, MessageKind::Rejection);
+            return false;
+        } else {
+            self.transaction_log.write_line(format!("COMMIT {}", transaction.id));
+            self.process_operations(transaction, MessageKind::Confirmation);
+            return true;
+        }
     }
 
     fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind) -> Vec<MessageKind>{

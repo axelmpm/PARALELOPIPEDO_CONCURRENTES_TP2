@@ -1,5 +1,4 @@
 use crate::service_kind::{ServiceKind, parse_kind};
-use std::fmt;
 
 #[derive(Debug)]
 pub struct Operation {

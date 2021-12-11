@@ -1,6 +1,0 @@
-REJECTED 1 :: Instant { t: 234543.947008516s }
-ABORT 1 :: Instant { t: 234543.947470713s }
-ACCEPTED 2 :: Instant { t: 234545.858059088s }
-COMMIT 2 :: Instant { t: 234545.858593471s }
-ACCEPTED 3 :: Instant { t: 234549.726165738s }
-COMMIT 3 :: Instant { t: 234549.726779149s }

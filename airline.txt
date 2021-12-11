@@ -1,2 +1,0 @@
-ACCEPTED 3 :: Instant { t: 234547.94413886s }
-COMMIT 3 :: Instant { t: 234549.726650514s }

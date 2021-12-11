@@ -5,20 +5,15 @@ use crate::processor::Processor;
 use std::net::{TcpListener, TcpStream};
 use std::io::{BufRead, BufReader};
 use std::io::ErrorKind::WouldBlock;
-use std::thread;
-use std::thread::JoinHandle;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use crate::logger::Logger;
 use std::io::Write;
-use std::time::Duration;
 
 pub struct Service {
     kind: ServiceKind,
     listener: TcpListener,
     processor: Arc<Processor>,
-    closed: AtomicBool,
     logger: Arc<Mutex<Logger>>
 }
 
@@ -31,13 +26,8 @@ impl Service {
             kind,
             listener: TcpListener::bind(address).unwrap(), 
             processor: Arc::new(Processor::new(logger.clone())),
-            closed: AtomicBool::new(false),
             logger,
         }
-    }
-
-    pub fn close(& self) {
-       self.closed.store(true, Ordering::Relaxed);
     }
 
     pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
@@ -64,7 +54,7 @@ impl Service {
         println!("new connection");
 
         stream.set_nonblocking(true).expect("Cannot set non-blocking");
-        let mut reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
+        let reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
         for line in reader.lines(){
 
             match line {
