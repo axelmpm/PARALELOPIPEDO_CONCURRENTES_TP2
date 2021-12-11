@@ -60,8 +60,8 @@ fn alglobo(){
     })
     .expect("Error setting Ctrl-C handler");
 
-    let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
-
+    //let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
+    let exit = false;
     if !exit{
         alglobo_retry_mode();
     }
@@ -80,11 +80,12 @@ fn alglobo_retry_mode(){
             invalid_cmd = false;
         }
 
-        let mut buffer = String::new();
-        let stdin = io::stdin(); // We get `Stdin` here.
-        stdin.read_line(&mut buffer);
-        match buffer.to_uppercase().as_ref() {
-            "X" => {
+        let mut input = String::new();
+        io::stdin().read_line(&mut input).unwrap();
+        input = input.to_uppercase();
+
+        match input.chars().next().unwrap() {
+            'X' => {
                 println!("Goodbye!");
                 exit = true;
             }
@@ -93,6 +94,5 @@ fn alglobo_retry_mode(){
                 invalid_cmd = true;
             }
         }
-        exit = true; // TODO (sacar). Lo pongo porque sino no anda el ctrlc y queda trabado.
     }
 }
