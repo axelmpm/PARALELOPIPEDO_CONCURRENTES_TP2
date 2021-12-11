@@ -13,9 +13,9 @@ impl Logger {
     pub fn new(log_file_name: String) -> Logger {
 
         let file = OpenOptions::new()
+            .truncate(true)
             .create(true)
             .write(true)
-            .append(true)
             .open(String::from(log_file_name))
             .expect("LOGGER: Couldn't open log file");
 

@@ -78,7 +78,7 @@ fn alglobo_retry_mode(alglobo: Alglobo){
         println!("Press [R] to retry a failed transaction");
         println!("Press [X] to exit");
         
-        match  read_char_from_stdin().unwrap() {
+        match read_char_from_stdin().unwrap() {
             'F' => {
                 alglobo.show_failed_transactions();
             },
