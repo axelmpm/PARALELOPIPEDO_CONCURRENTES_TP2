@@ -59,7 +59,12 @@ impl Alglobo {
         let leader_thread = thread::spawn(move || leader_clone.work());
 
         loop {
-            if !leader_election.am_i_leader() {
+            if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                *ctrlc_pressed_copy.lock().unwrap() = true;
+                leader_election.close();
+                break;
+            }
+            else if !leader_election.am_i_leader() {
 
                 leader_election.wait_until_leader_changes();
 
@@ -78,14 +83,11 @@ impl Alglobo {
                     self.process_operations(transaction, MessageKind::Confirmation);
                 }
 
-                if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
-                    *ctrlc_pressed_copy.lock().unwrap() = true;
-                    leader_election.close();
-                    println!("breaking loop because of ctrlc pressed");
-                    break;
-                }
+            } else{
+                break; // no more transacitions
             }
         }
+        leader_election.close();
         return *ctrlc_pressed.lock().unwrap();
     }
 

@@ -1,4 +1,5 @@
 use crate::service_kind::{ServiceKind, kind_address};
+use crate::message::deserialize;
 use crate::processor::Processor;
 
 use std::net::{TcpListener, TcpStream};
@@ -10,6 +11,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Receiver;
 use crate::logger::Logger;
+use std::io::Write;
+use std::time::Duration;
 
 pub struct Service {
     kind: ServiceKind,
@@ -34,20 +37,42 @@ impl Service {
     }
 
     pub fn close(& self) {
-        self.closed.store(true, Ordering::Relaxed);
+       self.closed.store(true, Ordering::Relaxed);
     }
 
     pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
 
-        println!("running service");
-        
+        println!("service started");
+
         self.listener.set_nonblocking(true).expect("Cannot set non-blocking");
-        let mut streams_threads = vec![];
-        
         for stream in self.listener.incoming() {
             match stream {
-                Ok(stream) =>  streams_threads.push(self.handle_connection(stream, ctrlc_event.clone())),
+                Ok(stream) => self.handle_connection(stream, ctrlc_event.clone()),
+                Err(ref e) if e.kind() == WouldBlock => {
+                    if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                        break; 
+                    }
+                    continue;
+                },
+                Err(e) => panic!("{}", e),
+            }
+        }
 
+    }
+
+    fn handle_connection(&self, mut stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>){
+        println!("new connection");
+
+        stream.set_nonblocking(true).expect("Cannot set non-blocking");
+        let mut reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
+        for line in reader.lines(){
+
+            match line {
+                Ok(line) => {
+                    let message = deserialize(line);
+                    let response = self.processor.process(message);
+                    stream.write_all(response.serialize().as_bytes()).unwrap();
+                }
                 Err(ref e) if e.kind() == WouldBlock => {
                     if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
                         break; 
@@ -55,46 +80,9 @@ impl Service {
                     continue;
                 },
 
-                Err(e) => panic!("encountered IO error: {}", e),
+                Err(e) => panic!("{}", e),
             }
         }
-
-        for streams_thread in streams_threads {
-            println!("joined streams_thread");
-            streams_thread.join();
-        }
-    }
-
-    fn handle_connection(&self, stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>) -> JoinHandle<()>{
-        println!("new connection");
-        let mut reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
-
-        let processor = self.processor.clone();
-        return thread::spawn(move || {
-
-            let mut buffer_line_threads = vec![];
-            loop {
-                let mut buffer = String::new();
-                reader.read_line(&mut buffer);
-                if buffer.len() > 0 {
-                    let stream = stream.try_clone().expect("could not clone stream");
-                    let processor = processor.clone();
-    
-                    buffer_line_threads.push(thread::spawn(move ||{ //TODO estos threads los podemos sacar, en clase dijeron que los services no reciven request concurrentemente
-                      processor.process(buffer, stream);
-                    }));
-                }
-
-                if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
-                    break; 
-                }
-            }
-
-            for buffer_line in buffer_line_threads {
-                println!("joined buffer_line");
-                buffer_line.join();
-            }
-        }
-        );
     }
 }
+

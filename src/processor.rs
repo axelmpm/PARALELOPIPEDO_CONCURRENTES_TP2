@@ -26,21 +26,20 @@ impl Processor {
         }
     }
 
-    pub fn process(&self, buffer: String, mut stream: TcpStream){
+    pub fn process(&self, message: Message) -> Message {
 
-        let message = deserialize(buffer);
         match message.kind.clone() {
             // Esto sería equivalente a un COMMIT
             MessageKind::Confirmation => {
                 self.logger.lock().unwrap().write_line(format!("COMMIT {}", message.body.id.to_string()));
-                stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
+                return Message::new(MessageKind::Ack, message.body);
                 // accept from pending storage
             },
 
             // Esto seria equivalente a un ROLLBACK
             MessageKind::Rejection => {
                 self.logger.lock().unwrap().write_line(format!("ABORT {}", message.body.id.to_string()));
-                stream.write_all(Message::new(MessageKind::Ack, message.body).serialize().as_bytes()).unwrap();
+                return Message::new(MessageKind::Ack, message.body);
                 // reject from pending storage
             },
 
@@ -49,20 +48,20 @@ impl Processor {
                 thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(500..2000)));
                 let luck = rand::thread_rng().gen_range(0..10);
                 self.storage.lock().unwrap().store(message.body.id.to_string());
-                if luck > 5 {
+                if luck > 1 {
                     //accepted
                     //println!("PROCESSOR: message.body = {}", message.body);
                     self.logger.lock().unwrap().write_line(format!("ACCEPTED {}", message.body.id.to_string()));
-                    stream.write_all(Message::new(MessageKind::Confirmation, message.body).serialize().as_bytes()).unwrap();
+                    return Message::new(MessageKind::Confirmation, message.body);
                 } else {
                     //rejected
                     //println!("PROCESSOR: message.body = {}", message.body);
                     self.logger.lock().unwrap().write_line(format!("REJECTED {}", message.body.id.to_string()));
-                    stream.write_all(Message::new(MessageKind::Rejection, message.body).serialize().as_bytes()).unwrap();
+                    return Message::new(MessageKind::Rejection, message.body);
                 }
             },
 
-            _ => {}
+            _ => {Message::new(MessageKind::Rejection, message.body)}
         }
     }
 }

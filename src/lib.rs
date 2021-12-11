@@ -53,9 +53,7 @@ fn alglobo(){
     //let port = args[3].parse::<i32>().unwrap();
 
     let (sender, receiver) = mpsc::channel();
-
-
-
+    
     ctrlc::set_handler(move || {
         println!("received Ctrl+C!");
         let _ = sender.send(());
@@ -72,7 +70,7 @@ fn alglobo(){
 fn alglobo_retry_mode(){
     let mut exit = false;
     let mut invalid_cmd = true;
-    //println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
+    println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
     while !exit{
 
         if invalid_cmd{
@@ -85,9 +83,6 @@ fn alglobo_retry_mode(){
         let mut buffer = String::new();
         let stdin = io::stdin(); // We get `Stdin` here.
         stdin.read_line(&mut buffer);
-
-        println!("{}",buffer);
-
         match buffer.to_uppercase().as_ref() {
             "X" => {
                 println!("Goodbye!");
