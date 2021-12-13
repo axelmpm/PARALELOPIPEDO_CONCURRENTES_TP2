@@ -19,6 +19,7 @@ use crate::leader_election::LeaderElection;
 pub struct Alglobo {
     host: String,
     port: i32,
+    id: u32,
     service_streams: HashMap<ServiceKind, TcpStream>,
     failed_transactions: HashMap<i32, Arc<Transaction>>,
     transaction_log: Logger,
@@ -26,7 +27,7 @@ pub struct Alglobo {
 
 impl Alglobo {
 
-    pub fn new(host: String, port: i32) -> Self {
+    pub fn new(host: String, port: i32, id:u32) -> Self {
         let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
         let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
         let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
@@ -38,7 +39,7 @@ impl Alglobo {
 
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
         
-        return Alglobo{host, port, service_streams, failed_transactions: HashMap::new(), transaction_log};
+        return Alglobo{host, port, id, service_streams, failed_transactions: HashMap::new(), transaction_log};
     }
 
     pub fn retry(&mut self, id: i32) -> bool{
@@ -60,9 +61,9 @@ impl Alglobo {
 
         let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
 
-        let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, 1); //todo get id from somewhere
+        let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, self.id); //todo get id from somewhere
         let leader_clone = leader_election.clone();
-        let leader_thread = thread::spawn(move || leader_clone.work());
+        let leader_thread = thread::spawn(move || leader_clone.ping_control());
 
         loop {
             if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
@@ -71,6 +72,7 @@ impl Alglobo {
                 break;
             }
             else if !leader_election.am_i_leader() {
+                println!("WAITING ELECTION");
 
                 leader_election.wait_until_leader_changes();
 

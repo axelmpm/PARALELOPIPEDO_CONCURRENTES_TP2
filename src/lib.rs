@@ -26,7 +26,7 @@ pub fn run() {
     let mode = &args[1];
 
     match mode.as_ref() {
-        "alglobo" => alglobo(),
+        "alglobo" => alglobo(args[2].parse::<u32>().unwrap()),
         "service" => service(args[2].clone()),
         _ => println!("invalid start mode")
     }
@@ -47,7 +47,7 @@ fn service(kind: String){
 
 }
 
-fn alglobo(){
+fn alglobo(id :u32){
     //let host = args[2].to_string();
     //let port = args[3].parse::<i32>().unwrap();
 
@@ -59,7 +59,7 @@ fn alglobo(){
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut alglobo = Alglobo::new("localhost".to_string(), 9000);
+    let mut alglobo = Alglobo::new("localhost".to_string(), 9000, id);
     let exit = alglobo.process(Arc::new(Mutex::new(receiver)));
     if !exit{
         alglobo_retry_mode(alglobo);
