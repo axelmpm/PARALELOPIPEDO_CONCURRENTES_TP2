@@ -60,7 +60,7 @@ impl Alglobo {
 
         let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
 
-        let leader_election = LeaderElection::new(self.port as u32); //todo get id from somewhere
+        let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, 1); //todo get id from somewhere
         let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || leader_clone.work());
 

@@ -7,12 +7,14 @@ use std::mem::size_of;
 use std::net::SocketAddr;
 use std::sync::mpsc::{Sender, Receiver};
 
-pub const N_NODES: u32 = 1;
+pub const N_NODES: u32 = 5;
 const TIME: u64 = 1500;
 const TIMEOUT: Option<Duration> = Some(Duration::from_millis(TIME));
 
 pub struct LeaderElection{
     id: u32,
+    host: String,
+    port: u32,
     sock: UdpSocket,
     current_leader: Arc<(Mutex<Option<u32>>, Condvar)>,
     electing: Arc<Mutex<bool>>,
@@ -23,14 +25,16 @@ pub struct LeaderElection{
 }
 
 impl LeaderElection {
-    pub fn new(id: u32) -> LeaderElection {
-        let addr = format!("127.0.0.1:{}", id);
+    pub fn new(host: String, port: u32, id: u32) -> LeaderElection {
+        let addr = format!("{}:{}", host, port + id);
         let sock = UdpSocket::bind(addr).expect("could not create socket");
         sock.set_read_timeout(TIMEOUT);
         let (sender, receiver) = mpsc::channel();
 
         return LeaderElection{
             id,
+            host,
+            port,
             sock,
             current_leader: Arc::new((Mutex::new(Some(id)), Condvar::new())),
             electing: Arc::new(Mutex::new(false)),
@@ -44,6 +48,8 @@ impl LeaderElection {
     pub fn clone(&self) -> LeaderElection {
         LeaderElection {
             id: self.id,
+            host: self.host.clone(),
+            port: self.port,
             sock: self.sock.try_clone().unwrap(),
             current_leader: self.current_leader.clone(),
             electing: self.electing.clone(),
@@ -81,7 +87,7 @@ impl LeaderElection {
             if lid == self.id {
                 self.sock.set_read_timeout(None);
             } else {
-                let addr = format!("127.0.0.1:{}", lid);
+                let addr = format!("{}:{}",self.host, self.port + lid);
                 self.sock.set_read_timeout(TIMEOUT);
                 self.sock.send_to(format!("P{}", self.id).as_ref(), addr);
             }
@@ -164,7 +170,7 @@ impl LeaderElection {
 
     fn send_election(&self){
         for i in (self.id+1)..N_NODES {//broadcast to bigger numbers
-            let addr = format!("127.0.0.1:{}", i);
+            let addr = format!("{}:{}", self.host, self.port + i);
             self.sock.send_to(format!("E{}", self.id).as_ref(), addr);
         }
     }
@@ -172,7 +178,7 @@ impl LeaderElection {
     fn send_all_but_self(&self, str: String){
         for i in 0..N_NODES { //broadcast to all
             if i != self.id {
-                let addr = format!("127.0.0.1:{}", i);
+                let addr = format!("{}:{}", self.host, self.port + i);
                 self.sock.send_to(format!("{}{}", str, self.id).as_ref(), addr);
             }
         }
