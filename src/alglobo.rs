@@ -28,24 +28,17 @@ pub struct Alglobo {
 impl Alglobo {
 
     pub fn new(host: String, port: i32, id:u32) -> Self {
-        let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
-        let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
-        let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
-
-        let mut service_streams = HashMap::new();
-        service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
-        service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
-        service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
 
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
-        
+        let mut service_streams = HashMap::new();
+
         return Alglobo{host, port, id, service_streams, failed_transactions: HashMap::new(), transaction_log};
     }
 
     pub fn retry(&mut self, id: i32) -> bool{
         if self.failed_transactions.contains_key(&id) {
             let transaction = self.failed_transactions.get(&id).unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR"));
-            if self.process_transaction(transaction.clone()){
+            if self.process_transaction(transaction.clone(), HashMap::new()){
                 self.failed_transactions.remove_entry(&id).unwrap();
             }
         } else {
@@ -76,9 +69,17 @@ impl Alglobo {
 
                 leader_election.wait_until_leader_changes();
 
-            } else if let Some(transaction) = transaction_parser.read_transaction() {
+            } else if let Some(transaction) = transaction_parser.read_transaction() {        
+                let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
+                let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
+                let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
+                let mut service_streams = HashMap::new();
+                service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
+                service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
+                service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
 
-                self.process_transaction(Arc::new(transaction));
+
+                self.process_transaction(Arc::new(transaction), service_streams);
 
             } else{
                 break; // no more transacitions
@@ -88,30 +89,30 @@ impl Alglobo {
         return *ctrlc_pressed.lock().unwrap();
     }
 
-    fn process_transaction(&mut self, transaction: Arc<Transaction>) -> bool{
+    fn process_transaction(&mut self, transaction: Arc<Transaction>, service_streams: HashMap<ServiceKind, TcpStream>) -> bool{
 
         self.transaction_log.write_line(format!("INIT {}", transaction.id));
-        let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
+        let responses = self.process_operations(transaction.clone(), MessageKind::Transaction, &service_streams);
 
         if responses.contains(&MessageKind::Rejection) {
             self.transaction_log.write_line(format!("ABORT {}", transaction.id));
             self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
-            self.process_operations(transaction, MessageKind::Rejection);
+            self.process_operations(transaction, MessageKind::Rejection, &service_streams);
             return false;
         } else {
             self.transaction_log.write_line(format!("COMMIT {}", transaction.id));
-            self.process_operations(transaction, MessageKind::Confirmation);
+            self.process_operations(transaction, MessageKind::Confirmation, &service_streams);
             return true;
         }
     }
 
-    fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind) -> Vec<MessageKind>{
+    fn process_operations(&self, transaction: Arc<Transaction>, kind: MessageKind, service_streams: &HashMap<ServiceKind, TcpStream>) -> Vec<MessageKind>{
 
         let mut loglist = vec![];
         for operation in &transaction.operations {
             let body = MessageBody::new(transaction.id, operation.service, operation.amount as i32, 0);
             let message = Message::new(kind, body);
-            let mut service_stream = self.service_streams.get_key_value(&operation.service).unwrap().1;
+            let mut service_stream = service_streams.get_key_value(&operation.service).unwrap().1;
             service_stream.write_all(message.serialize().as_bytes()).unwrap();
 
             let mut reader = BufReader::new(service_stream.try_clone().expect("could not clone stream"));
