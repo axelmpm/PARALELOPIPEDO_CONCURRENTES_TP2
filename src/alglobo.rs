@@ -13,15 +13,15 @@ use std::sync::mpsc::Receiver;
 use std::thread;
 use std::collections::HashMap;
 use crate::transaction::Transaction;
-use crate::leader_election::LeaderElection;
+use crate::leader_election::{LeaderElection, N_NODES};
 
 
 pub struct Alglobo {
     host: String,
     port: i32,
-    service_streams: HashMap<ServiceKind, TcpStream>,
-    failed_transactions: HashMap<i32, Arc<Transaction>>,
-    transaction_log: Logger,
+    service_streams: Arc<Mutex<HashMap<ServiceKind, TcpStream>>>,
+    failed_transactions: Arc<Mutex<HashMap<i32, Arc<Transaction>>>>,
+    transaction_log: Arc<Mutex<Logger>>,
 }
 
 impl Alglobo {
@@ -38,7 +38,23 @@ impl Alglobo {
 
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
         
-        return Alglobo{host, port, service_streams, failed_transactions: HashMap::new(), transaction_log};
+        return Alglobo{
+            host,
+            port,
+            service_streams: Arc::new(Mutex::new(service_streams)),
+            failed_transactions: Arc::new(Mutex::new(HashMap::new())),
+            transaction_log: Arc::new(Mutex::new(transaction_log))
+        };
+    }
+
+    pub fn clone(&self)-> Alglobo {
+        return Alglobo{
+            host: self.host.clone(),
+            port: self.port,
+            service_streams: self.service_streams.clone(),
+            failed_transactions:self.failed_transactions.clone(),
+            transaction_log: self.transaction_log.clone()
+        }
     }
 
     pub fn retry(&mut self, id: i32) -> bool{
@@ -60,28 +76,32 @@ impl Alglobo {
 
         let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
 
-        let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, 1); //todo get id from somewhere
-        let leader_clone = leader_election.clone();
-        let leader_thread = thread::spawn(move || leader_clone.work());
+        let mut handles = vec!();
+        for id in 0..N_NODES {
 
-        loop {
-            if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
-                *ctrlc_pressed_copy.lock().unwrap() = true;
-                leader_election.close();
-                break;
-            }
-            else if !leader_election.am_i_leader() {
+            let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, id); //todo get id from somewhere
+            let leader_clone = leader_election.clone();
+            let leader_thread = thread::spawn(move || leader_clone.work());
+            let mut alglobo = self.clone();
 
-                leader_election.wait_until_leader_changes();
-
-            } else if let Some(transaction) = transaction_parser.read_transaction() {
-
-                self.process_transaction(Arc::new(transaction));
-
-            } else{
-                break; // no more transacitions
-            }
+            handles.push(thread::spawn(move || {
+                loop {
+                    if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                        *ctrlc_pressed_copy.lock().unwrap() = true;
+                        leader_election.close();
+                        break;
+                    } else if !leader_election.am_i_leader() {
+                        leader_election.wait_until_leader_changes();
+                    } else if let Some(transaction) = transaction_parser.read_transaction() {
+                        alglobo.process_transaction(Arc::new(transaction));
+                    } else {
+                        break; // no more transacitions
+                    }
+                }
+            }));
         }
+        handles.into_iter().for_each(|h| { h.join(); });
+
         leader_election.close();
         return *ctrlc_pressed.lock().unwrap();
     }
