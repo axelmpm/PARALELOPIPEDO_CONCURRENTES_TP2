@@ -19,6 +19,15 @@ impl TransactionParser {
     }
   }
 
+  pub fn seek_transaction(&mut self, id: i32) -> Option<Transaction> {
+    while let Some(tx) = self.read_transaction() {
+      if tx.id == id {
+        return Some(tx);
+      }
+    }
+    return None;
+  }
+
   pub fn read_transaction(&mut self) -> Option<Transaction> {
     let mut operations = vec![];
     let total_operations;

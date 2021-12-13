@@ -10,6 +10,8 @@ pub mod logger;
 pub mod transaction_parser;
 pub mod operation;
 pub mod transaction;
+pub mod transaction_log_parser;
+pub mod transaction_phase;
 pub mod leader_election;
 
 use std::env;

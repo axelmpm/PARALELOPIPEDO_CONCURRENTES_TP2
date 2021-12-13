@@ -3,7 +3,10 @@ use crate::message_body::MessageBody;
 use crate::message::{Message, deserialize};
 use crate::message_kind::MessageKind;
 use crate::logger::Logger;
+use crate::transaction_log_parser::TransactionLogParser;
 use crate::transaction_parser::TransactionParser;
+use crate::transaction_phase::TransactionPhase;
+use std::fs::read_dir;
 use std::net::{TcpStream};
 use std::io::Write;
 use std::io::BufReader;
@@ -57,14 +60,43 @@ impl Alglobo {
         let leader_election = LeaderElection::new(self.port as u32); //todo get id from somewhere
         let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || leader_clone.work());
-
+        let mut last_processed_transaction: Option<(i32, TransactionPhase)>;
         loop {
             if !leader_election.am_i_leader() {
 
                 leader_election.wait_until_leader_changes();
 
-            } else if let Some(transaction) = transaction_parser.read_transaction() {
+                if leader_election.am_i_leader() {
+                    // Continue with transcation left from last leader
+                    last_processed_transaction = TransactionLogParser::new().get_last_transaction();
 
+                    if let Some((id, phase)) = last_processed_transaction {
+                        if let Some(transaction) = transaction_parser.seek_transaction(id) {
+                            let transaction = Arc::new(transaction);
+                            // If transaction was left at INIT stage
+                            if phase == TransactionPhase::Init {
+                                let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
+                                if responses.contains(&MessageKind::Rejection) {
+                                    transaction_log.write_line(format!("ABORT {}", transaction.id));
+                                    self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
+                                } else {
+                                    transaction_log.write_line(format!("COMMIT {}", transaction.id));
+                                    self.process_operations(transaction, MessageKind::Confirmation);
+                                }
+                            } else if phase == TransactionPhase::Abort { // If transaction was left at ABORT stage
+                                self.process_operations(transaction, MessageKind::Rejection);
+                            } else if phase == TransactionPhase::Commit { // If transaction was left at COMMIT stage
+                                self.process_operations(transaction, MessageKind::Confirmation);
+                            }
+                            if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
+                                *ctrlc_pressed_copy.lock().unwrap() = true;
+                                leader_election.close();
+                                break;
+                            }
+                        }
+                    }
+                }
+            } else if let Some(transaction) = transaction_parser.read_transaction() {
                 let transaction = Arc::new(transaction);
                 transaction_log.write_line(format!("INIT {}", transaction.id));
                 let responses = self.process_operations(transaction.clone(), MessageKind::Transaction);
