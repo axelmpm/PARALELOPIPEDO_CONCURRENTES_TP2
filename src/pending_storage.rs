@@ -4,11 +4,18 @@ pub struct PendingStorage {
     pending_confirmation: HashSet<String>,
 }
 
+impl Default for PendingStorage {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl PendingStorage {
     pub fn new() -> PendingStorage {
-        return PendingStorage {
+        PendingStorage {
             pending_confirmation: HashSet::new(),
-        };
+        }
     }
 
     pub fn store(&mut self, value: String) {
@@ -24,6 +31,6 @@ impl PendingStorage {
         for v in &self.pending_confirmation {
             res.push(v.clone());
         }
-        return res;
+        res
     }
 }

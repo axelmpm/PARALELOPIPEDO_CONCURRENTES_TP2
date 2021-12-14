@@ -10,10 +10,10 @@ pub struct Message {
 
 impl Message {
     pub fn new(kind: MessageKind, body: MessageBody) -> Message {
-        return Message {
-            kind: kind,
-            body: body,
-        };
+        Message {
+            kind,
+            body,
+        }
     }
 
     pub fn serialize(&self) -> String {

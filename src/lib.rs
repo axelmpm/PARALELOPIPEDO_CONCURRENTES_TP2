@@ -70,7 +70,6 @@ fn alglobo_retry_mode(mut alglobo: Alglobo) {
     let mut exit = false;
     println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
     while !exit {
-        println!("");
         println!("==========================================");
         println!("Press [F] to see all failed transactions");
         println!("Press [R] to retry a failed transaction");

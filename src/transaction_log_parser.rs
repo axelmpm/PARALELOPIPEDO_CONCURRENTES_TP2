@@ -7,6 +7,13 @@ use std::io::SeekFrom;
 use crate::transaction_phase::{decode, TransactionPhase};
 pub struct TransactionLogParser {}
 
+impl Default for TransactionLogParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+
 impl TransactionLogParser {
     pub fn new() -> Self {
         TransactionLogParser {}

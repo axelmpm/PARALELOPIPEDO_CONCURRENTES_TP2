@@ -21,12 +21,12 @@ impl Service {
     pub fn new(kind: ServiceKind) -> Service {
         let address = format!("localhost:{}", kind_address(kind));
         let logger = Arc::new(Mutex::new(Logger::new(kind.to_string() + ".txt")));
-        return Service {
+        Service {
             kind,
             listener: TcpListener::bind(address).unwrap(),
             processor: Arc::new(Processor::new(logger.clone())),
             _logger: logger,
-        };
+        }
     }
 
     pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {

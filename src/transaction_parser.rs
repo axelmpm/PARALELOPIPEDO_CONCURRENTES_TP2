@@ -26,7 +26,7 @@ impl TransactionParser {
                 return Some(tx);
             }
         }
-        return None;
+        None
     }
 
     pub fn read_transaction(&mut self) -> Option<Transaction> {

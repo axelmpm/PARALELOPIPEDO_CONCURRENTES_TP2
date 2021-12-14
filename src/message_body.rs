@@ -28,7 +28,7 @@ pub fn body_parser(line: String) -> MessageBody {
     let total = params[3].parse::<i32>().unwrap();
     let service = parse_kind(params[1].to_string()).unwrap();
 
-    return MessageBody::new(id, service, amount, total);
+    MessageBody::new(id, service, amount, total)
 }
 
 impl fmt::Display for MessageBody {

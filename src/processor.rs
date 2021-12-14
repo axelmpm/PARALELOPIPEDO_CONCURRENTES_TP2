@@ -24,14 +24,14 @@ impl Processor {
     }
 
     pub fn process(&self, message: Message, service: ServiceKind) -> Message {
-        match message.kind.clone() {
+        match message.kind {
             // Esto sería equivalente a un COMMIT
             MessageKind::Confirmation => {
                 self.logger
                     .lock()
                     .unwrap()
                     .write_line(format!("{} COMMIT {}", service.to_string(), message.body.id.to_string()));
-                return Message::new(MessageKind::Ack, message.body);
+                Message::new(MessageKind::Ack, message.body)
                 // accept from pending storage
             }
 
@@ -41,7 +41,7 @@ impl Processor {
                     .lock()
                     .unwrap()
                     .write_line(format!("{} ABORT {}", service.to_string(), message.body.id.to_string()));
-                return Message::new(MessageKind::Ack, message.body);
+                Message::new(MessageKind::Ack, message.body)
                 // reject from pending storage
             }
 
@@ -62,7 +62,7 @@ impl Processor {
                         .lock()
                         .unwrap()
                         .write_line(format!("{} ACCEPTED {}", service.to_string(), message.body.id.to_string()));
-                    return Message::new(MessageKind::Confirmation, message.body);
+                    Message::new(MessageKind::Confirmation, message.body)
                 } else {
                     //rejected
                     //println!("PROCESSOR: message.body = {}", message.body);
@@ -70,7 +70,7 @@ impl Processor {
                         .lock()
                         .unwrap()
                         .write_line(format!("{} REJECTED {}", service.to_string(), message.body.id.to_string()));
-                    return Message::new(MessageKind::Rejection, message.body);
+                    Message::new(MessageKind::Rejection, message.body)
                 }
             }
 

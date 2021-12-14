@@ -32,14 +32,14 @@ impl Alglobo {
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
         let failed_transaction_log = Logger::new("failed_transactions_log.txt".to_owned());
 
-        return Alglobo {
+        Alglobo {
             host,
             port,
             id,
             failed_transactions: HashMap::new(),
             failed_transaction_log,
             transaction_log,
-        };
+        }
     }
 
     pub fn retry(&mut self, id: i32) -> bool {
@@ -54,7 +54,7 @@ impl Alglobo {
         } else {
             return false;
         }
-        return true;
+        true
     }
 
     pub fn process(&mut self, ctrlc_event: Arc<Mutex<Receiver<()>>>) -> bool {
@@ -98,7 +98,7 @@ impl Alglobo {
         let forced = *ctrlc_pressed.lock().unwrap();
         let leader = leader_election.am_i_leader();
         leader_election.close(!forced);
-        return forced || !leader;
+        forced || !leader
     }
 
     fn init_new_leader(&mut self, transaction_parser: Arc<Mutex<TransactionParser>>){
@@ -142,7 +142,7 @@ impl Alglobo {
                 .expect("No fue posible conectarse a servicio de Aerolinea"),
         );
 
-        return self.process_transaction(transaction, service_streams, phase);
+        self.process_transaction(transaction, service_streams, phase)
     }
 
     fn process_transaction(
@@ -162,17 +162,17 @@ impl Alglobo {
                 );
 
                 if responses.contains(&MessageKind::Rejection) {
-                    return self.process_transaction(
+                    self.process_transaction(
                         transaction,
                         service_streams,
                         TransactionPhase::Abort,
-                    );
+                    )
                 } else {
-                    return self.process_transaction(
+                    self.process_transaction(
                         transaction,
                         service_streams,
                         TransactionPhase::Commit,
-                    );
+                    )
                 }
             }
             TransactionPhase::Abort => {
@@ -187,13 +187,13 @@ impl Alglobo {
                     .entry(id)
                     .or_insert_with(|| transaction_cpy);
                 self.process_operations(transaction_cpy2, MessageKind::Rejection, &service_streams);
-                return false;
+                false
             }
             TransactionPhase::Commit => {
                 self.transaction_log
                     .write_line(format!("COMMIT {} alglobo <{}>", transaction.id, self.id));
                 self.process_operations(transaction, MessageKind::Confirmation, &service_streams);
-                return true;
+                true
             }
         }
     }
@@ -223,12 +223,12 @@ impl Alglobo {
             let mut buffer = String::new();
             reader.read_line(&mut buffer).unwrap();
 
-            if buffer.len() > 0 {
+            if !buffer.is_empty() {
                 let incoming_message = deserialize(buffer);
                 loglist.push(incoming_message.kind);
             }
         }
-        return loglist;
+        loglist
     }
 
     pub fn retrieve_failed_transactions(&mut self) {
@@ -243,7 +243,7 @@ impl Alglobo {
     }
 
     pub fn show_failed_transactions(&self) {
-        if self.failed_transactions.len() == 0 {
+        if self.failed_transactions.is_empty() {
             println!("no failed transactions");
         } else {
             for (key, value) in &self.failed_transactions {

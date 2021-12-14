@@ -31,6 +31,23 @@ fn to_workaddr(host: String, port: u32, id: u32) -> String {
     format!("{}:{}", host, port + id)
 }
 
+impl Clone for LeaderElection {
+    fn clone(&self) -> Self {
+        LeaderElection {
+            id: self.id,
+            host: self.host.clone(),
+            port: self.port,
+            sock: self.sock.try_clone().unwrap(),
+            ping_sock: self.ping_sock.try_clone().unwrap(),
+            current_leader: self.current_leader.clone(),
+            electing: self.electing.clone(),
+            got_ok: self.got_ok.clone(),
+            leader_changed: self.leader_changed.clone(),
+            finished: self.finished.clone(),
+        }
+    }
+}
+
 impl LeaderElection {
     pub fn new(host: String, port: u32, id: u32) -> LeaderElection {
         let addr = to_workaddr(host.clone(), port, id);
@@ -70,26 +87,11 @@ impl LeaderElection {
 
         leader.elect_new_leader();
 
-        return leader;
-    }
-
-    pub fn clone(&self) -> LeaderElection {
-        LeaderElection {
-            id: self.id,
-            host: self.host.clone(),
-            port: self.port,
-            sock: self.sock.try_clone().unwrap(),
-            ping_sock: self.ping_sock.try_clone().unwrap(),
-            current_leader: self.current_leader.clone(),
-            electing: self.electing.clone(),
-            got_ok: self.got_ok.clone(),
-            leader_changed: self.leader_changed.clone(),
-            finished: self.finished.clone(),
-        }
+        leader
     }
 
     pub fn is_done(&self) -> bool {
-        return *self.finished.lock().unwrap();
+        *self.finished.lock().unwrap()
     }
 
     fn id_to_msg(&self, header: u8) -> Vec<u8> {
