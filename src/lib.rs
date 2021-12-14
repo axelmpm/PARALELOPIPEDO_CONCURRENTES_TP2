@@ -1,42 +1,40 @@
+pub mod alglobo;
+pub mod leader_election;
+pub mod logger;
+pub mod message;
+pub mod message_body;
+pub mod message_kind;
+pub mod operation;
+pub mod pending_storage;
+pub mod processor;
 pub mod service;
 pub mod service_kind;
-pub mod alglobo;
-pub mod pending_storage;
-pub mod message;
-pub mod message_kind;
-pub mod processor;
-pub mod message_body;
-pub mod logger;
-pub mod transaction_parser;
-pub mod operation;
 pub mod transaction;
+pub mod transaction_log_parser;
+pub mod transaction_parser;
+pub mod transaction_phase;
 
 use std::env;
 
-use crate::service_kind::ServiceKind;
-use crate::service::Service;
 use crate::alglobo::Alglobo;
-use std::sync::{Arc, mpsc, Mutex};
+use crate::service::Service;
+use std::fs::File;
 use std::io;
-
-
+use std::sync::{mpsc, Arc, Mutex};
 
 pub fn run() {
-
-    println!("Hello, world!");
-
     let args: Vec<String> = env::args().collect();
-    let param = &args[1];
+    let mode = &args[1];
 
-    match param.as_ref() {
-        "alglobo" => alglobo(),
-        _ => service(param.clone()),
-        // _ => {}
+    match mode.as_ref() {
+        "clear" => clear_files(),
+        "alglobo" => alglobo(args[2].parse::<u32>().unwrap()),
+        "service" => service(args[2].clone()),
+        _ => println!("invalid start mode"),
     }
 }
 
-fn service(kind: String){
-            
+fn service(kind: String) {
     let service = Arc::new(Service::new(service_kind::parse_kind(kind).unwrap()));
     let (sender, receiver) = mpsc::channel();
 
@@ -47,16 +45,13 @@ fn service(kind: String){
     .expect("Error setting Ctrl-C handler");
 
     service.run(Arc::new(Mutex::new(receiver)));
-
 }
 
-fn alglobo(){
+fn alglobo(id: u32) {
     //let host = args[2].to_string();
     //let port = args[3].parse::<i32>().unwrap();
 
     let (sender, receiver) = mpsc::channel();
-
-
 
     ctrlc::set_handler(move || {
         println!("received Ctrl+C!");
@@ -64,43 +59,57 @@ fn alglobo(){
     })
     .expect("Error setting Ctrl-C handler");
 
-    let exit = Alglobo::new("localhost".to_string(), 9000).process(Arc::new(Mutex::new(receiver)));
-    
-    println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
-
-    if !exit{
-        alglobo_retry_mode();
+    let mut alglobo = Alglobo::new("localhost".to_string(), 10000, id);
+    let exit = alglobo.process(Arc::new(Mutex::new(receiver)));
+    if !exit {
+        alglobo_retry_mode(alglobo);
     }
 }
 
-fn alglobo_retry_mode(){
+fn alglobo_retry_mode(mut alglobo: Alglobo) {
     let mut exit = false;
-    let mut invalid_cmd = true;
-    while !exit{
+    println!("Welcome to AlGlobo.com! My name is Globby🎈 how can I help you? :)");
+    while !exit {
+        println!("==========================================");
+        println!("Press [F] to see all failed transactions");
+        println!("Press [R] to retry a failed transaction");
+        println!("Press [X] to exit");
 
-        if invalid_cmd{
-            println!("Press [F] to see all failed transactions");
-            println!("Press [R] to retry a failed transaction");
-            println!("Press [X] to exit");
-            invalid_cmd = false;
-        }
-
-        let mut buffer = String::new();
-        let stdin = io::stdin(); // We get `Stdin` here.
-        stdin.read_line(&mut buffer);
-
-        println!("{}",buffer);
-
-        match buffer.to_uppercase().as_ref() {
-            "X" => {
+        match read_char_from_stdin().unwrap() {
+            'F' => {
+                alglobo.show_failed_transactions();
+            }
+            'R' => {
+                println!("input id to retry");
+                let id = read_char_from_stdin().unwrap().to_digit(10).unwrap();
+                if alglobo.retry(id as i32) {
+                    println!("success in retry!");
+                } else {
+                    println!("id inputed not found");
+                }
+            }
+            'X' => {
                 println!("Goodbye!");
                 exit = true;
             }
             _ => {
                 println!("Unknown command");
-                invalid_cmd = true;
             }
         }
-        exit = true; // TODO (sacar). Lo pongo porque sino no anda el ctrlc y queda trabado.
     }
+}
+
+fn read_char_from_stdin() -> Option<char> {
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).unwrap();
+    input = input.to_uppercase();
+    return input.chars().next();
+}
+
+fn clear_files() {
+    File::create("airline.txt").unwrap();
+    File::create("hotel.txt").unwrap();
+    File::create("bank.txt").unwrap();
+    File::create("transaction_log.txt").unwrap();
+    File::create("failed_transactions_log.txt").unwrap();
 }

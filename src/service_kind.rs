@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, PartialEq, Eq, Hash, Debug)]
 pub enum ServiceKind {
     Hotel,
     Airline,
@@ -26,10 +26,14 @@ pub fn kind_address(kind: ServiceKind) -> i32 {
 
 impl fmt::Display for ServiceKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", match self {
-            ServiceKind::Hotel => "hotel",
-            ServiceKind::Airline => "airline",
-            ServiceKind::Bank => "bank",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                ServiceKind::Hotel => "hotel",
+                ServiceKind::Airline => "airline",
+                ServiceKind::Bank => "bank",
+            }
+        )
     }
 }

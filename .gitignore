@@ -13,3 +13,9 @@ Cargo.lock
 # Added by cargo
 
 /target
+
+airline.txt
+bank.txt
+hotel.txt
+failed_transactions_log.txt
+transaction_log.txt
