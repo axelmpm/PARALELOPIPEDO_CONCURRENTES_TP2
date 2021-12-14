@@ -1,15 +1,9 @@
-1,hotel,5,2 :: Instant { t: 422281.972873057s }
-1,bank,10,2 :: Instant { t: 422281.972965085s }
-2,bank,100,1 :: Instant { t: 422283.187549905s }
-3,hotel,5,3 :: Instant { t: 422285.676707271s }
-3,airline,10,3 :: Instant { t: 422285.676727113s }
-3,bank,7,3 :: Instant { t: 422285.676743535s }
-5,hotel,5,3 :: Instant { t: 422294.841998523s }
-5,airline,10,3 :: Instant { t: 422294.842037866s }
-5,bank,7,3 :: Instant { t: 422294.842068656s }
-8,hotel,5,3 :: Instant { t: 422306.566382871s }
-8,airline,10,3 :: Instant { t: 422306.566402029s }
-8,bank,7,3 :: Instant { t: 422306.566417082s }
-9,hotel,5,3 :: Instant { t: 422310.380329374s }
-9,airline,10,3 :: Instant { t: 422310.380346479s }
-9,bank,7,3 :: Instant { t: 422310.38036119s }
+4,hotel,5,3
+4,airline,10,3
+4,bank,7,3
+7,hotel,5,3
+7,airline,10,3
+7,bank,7,3
+9,hotel,5,3
+9,airline,10,3
+9,bank,7,3

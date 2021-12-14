@@ -12,7 +12,7 @@ impl TransactionLogParser {
 
   pub fn parse_log_line(&self, line: String) -> (i32, TransactionPhase) {
     let v = line.split(' ').collect::<Vec<&str>>();
-    let transaction_id = v[0].to_owned().parse::<i32>().unwrap();
+    let transaction_id = v[1].to_owned().parse::<i32>().unwrap();
     let transaction_phase = decode(v[1].to_owned());
     (transaction_id, transaction_phase)
   }

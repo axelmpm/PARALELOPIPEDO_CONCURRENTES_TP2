@@ -74,7 +74,6 @@ impl Alglobo {
                 leader_election.wait_until_leader_changes();
 
                 if leader_election.is_done(){
-                    println!("is_done()");
                     break;
                 }
 
@@ -82,7 +81,7 @@ impl Alglobo {
 
                     self.retrieve_failed_transactions();
 
-                    // Continue with transcation left from last leader
+                    // Continue with transaction left from last leader
                     last_processed_transaction = TransactionLogParser::new().get_last_transaction();
 
                     if let Some((id, phase)) = last_processed_transaction {
@@ -101,7 +100,7 @@ impl Alglobo {
         }
         let forced = *ctrlc_pressed.lock().unwrap();
         leader_election.close(!forced);
-        return forced && leader_election.am_i_leader();
+        return forced || !leader_election.am_i_leader();
     }
 
     fn connect_and_process_transaction(&mut self, transaction: Arc<Transaction>, phase: TransactionPhase) -> bool{

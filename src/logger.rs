@@ -34,23 +34,40 @@ impl Logger {
         .expect("LOGGER: Couldn't log to file");
     }
 
+    fn _write_line(&mut self, line: String, with_time: bool) {
+
+        if with_time {
+            writeln!(
+                self.file,
+                "{} :: {:?}",
+                line,
+                Instant::now()
+    
+            )
+            .expect("LOGGER: Couldn't log to file");
+        } else {
+            writeln!(
+                self.file,
+                "{}",
+                line,
+            )
+            .expect("LOGGER: Couldn't log to file");
+        }
+    }
+
     pub fn write_line(&mut self, line: String) {
-        writeln!(
-            self.file,
-            "{} :: {:?}",
-            line,
-            Instant::now()
+        println!("{}", &line);
+        self._write_line(line, true);
+    }
 
-        )
-        .expect("LOGGER: Couldn't log to file");
-
-        //println!("{}", line);
+    pub fn quiet_write_line(&mut self, line: String) {
+        self._write_line(line, false);
     }
 
     pub fn log_transaction(&mut self, transaction: Arc<Transaction>) {
         let total = transaction.operations.len();
         for operation in &transaction.operations{
-            self.write_line(format!("{},{},{},{}", transaction.id, operation.service, operation.amount, total));
+            self.quiet_write_line(format!("{},{},{},{}", transaction.id, operation.service, operation.amount, total));
         }
     }
 }
