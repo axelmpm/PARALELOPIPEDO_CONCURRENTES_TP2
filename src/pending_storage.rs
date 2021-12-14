@@ -10,7 +10,6 @@ impl Default for PendingStorage {
     }
 }
 
-
 impl PendingStorage {
     pub fn new() -> PendingStorage {
         PendingStorage {

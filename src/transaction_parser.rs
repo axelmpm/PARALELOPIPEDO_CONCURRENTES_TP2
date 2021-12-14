@@ -14,7 +14,8 @@ pub struct TransactionParser {
 impl TransactionParser {
     pub fn new(path: String) -> Self {
         let mut file = File::open(path).expect("Problem opening file");
-        file.seek(SeekFrom::Start(0)).unwrap();
+        file.seek(SeekFrom::Start(0))
+            .unwrap_or_else(|_| panic!("TRANSACTION PARSER: INTERNAL ERRROR"));
         let reader = BufReader::new(file);
         let lines = Box::new(reader.lines().flatten());
         TransactionParser { lines }
@@ -36,14 +37,25 @@ impl TransactionParser {
         if let Some(line) = self.lines.next() {
             operations.push(parse_operation(line.clone()));
             let s = line.split(',').collect::<Vec<&str>>();
-            transaction_id = s.first().unwrap().parse::<i32>().unwrap();
-            total_operations = s.last().unwrap().parse::<i32>().unwrap();
+            transaction_id = s
+                .first()
+                .unwrap_or_else(|| panic!("TRANSACTION PARSER: INTERNAL ERRROR"))
+                .parse::<i32>()
+                .unwrap_or_else(|_| panic!("TRANSACTION PARSER: INTERNAL ERRROR"));
+            total_operations = s
+                .last()
+                .unwrap_or_else(|| panic!("TRANSACTION PARSER: INTERNAL ERRROR"))
+                .parse::<i32>()
+                .unwrap_or_else(|_| panic!("TRANSACTION PARSER: INTERNAL ERRROR"));
         } else {
             return None;
         }
 
         for _ in 1..total_operations {
-            let line = self.lines.next().unwrap();
+            let line = self
+                .lines
+                .next()
+                .unwrap_or_else(|| panic!("TRANSACTION PARSER: INTERNAL ERRROR"));
             operations.push(parse_operation(line));
         }
 

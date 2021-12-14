@@ -9,7 +9,6 @@ use crate::transaction_log_parser::TransactionLogParser;
 use crate::transaction_parser::TransactionParser;
 use crate::transaction_phase::TransactionPhase;
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::Write;
@@ -47,9 +46,17 @@ impl Alglobo {
             let transaction = self
                 .failed_transactions
                 .get(&id)
-                .unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR")).clone();
+                .unwrap_or_else(|| panic!("ALGLOBO <{}>: INTERNAL ERROR", self.id))
+                .clone();
             if self.connect_and_process_transaction(transaction, TransactionPhase::Init) {
-                self.failed_transactions.remove_entry(&id).unwrap();
+                self.failed_transactions
+                    .remove_entry(&id)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "ALGLOBO <{}>: couldn't remove from map transaction {}",
+                            self.id, id
+                        )
+                    });
             }
         } else {
             return false;
@@ -61,7 +68,9 @@ impl Alglobo {
         let ctrlc_pressed = Arc::new(Mutex::new(false));
         let ctrlc_pressed_copy = ctrlc_pressed.clone();
 
-        let transaction_parser = Arc::new(Mutex::new(TransactionParser::new("transactions.txt".to_owned())));
+        let transaction_parser = Arc::new(Mutex::new(TransactionParser::new(
+            "transactions.txt".to_owned(),
+        )));
 
         let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, self.id); //todo get id from somewhere
         let leader_clone = leader_election.clone();
@@ -72,10 +81,16 @@ impl Alglobo {
         }
 
         loop {
-            if ctrlc_event.lock().unwrap().try_recv().is_ok() {
+            if ctrlc_event
+                .lock()
+                .unwrap_or_else(|_| panic!("ALGLOBO <{}>: could adquire ctrlc lock", self.id))
+                .try_recv()
+                .is_ok()
+            {
                 //received ctrlc
-                *ctrlc_pressed_copy.lock().unwrap() = true;
-                break;
+                *ctrlc_pressed_copy.lock().unwrap_or_else(|_| {
+                    panic!("ALGLOBO <{}>: could adquire ctrlc lock", self.id)
+                }) = true;
             } else if !leader_election.am_i_leader() {
                 println!("WAITING ELECTION");
 
@@ -86,22 +101,27 @@ impl Alglobo {
                 }
 
                 if leader_election.am_i_leader() {
-                   self.init_new_leader(transaction_parser.clone());
+                    self.init_new_leader(transaction_parser.clone());
                 }
-            } else if let Some(transaction) = transaction_parser.lock().expect("poisoned!").read_transaction() {
+            } else if let Some(transaction) = transaction_parser
+                .lock()
+                .expect("poisoned!")
+                .read_transaction()
+            {
                 self.connect_and_process_transaction(Arc::new(transaction), TransactionPhase::Init);
             } else {
-                println!("finished processing transactions");
                 break; // no more transacitions
             }
         }
-        let forced = *ctrlc_pressed.lock().unwrap();
+        let forced = *ctrlc_pressed
+            .lock()
+            .unwrap_or_else(|_| panic!("ALGLOBO <{}>: could adquire ctrlc lock", self.id));
         let leader = leader_election.am_i_leader();
         leader_election.close(!forced);
         forced || !leader
     }
 
-    fn init_new_leader(&mut self, transaction_parser: Arc<Mutex<TransactionParser>>){
+    fn init_new_leader(&mut self, transaction_parser: Arc<Mutex<TransactionParser>>) {
         self.transaction_log.init(); //idempotente
         self.failed_transaction_log.init(); //idempotente
 
@@ -111,7 +131,11 @@ impl Alglobo {
         let last_processed_transaction = TransactionLogParser::new().get_last_transaction();
 
         if let Some((id, phase)) = last_processed_transaction {
-            if let Some(transaction) = transaction_parser.lock().expect("poisoned!").seek_transaction(id) {
+            if let Some(transaction) = transaction_parser
+                .lock()
+                .expect("poisoned!")
+                .seek_transaction(id)
+            {
                 self.connect_and_process_transaction(Arc::new(transaction), phase);
             }
         }
@@ -162,17 +186,9 @@ impl Alglobo {
                 );
 
                 if responses.contains(&MessageKind::Rejection) {
-                    self.process_transaction(
-                        transaction,
-                        service_streams,
-                        TransactionPhase::Abort,
-                    )
+                    self.process_transaction(transaction, service_streams, TransactionPhase::Abort)
                 } else {
-                    self.process_transaction(
-                        transaction,
-                        service_streams,
-                        TransactionPhase::Commit,
-                    )
+                    self.process_transaction(transaction, service_streams, TransactionPhase::Commit)
                 }
             }
             TransactionPhase::Abort => {
@@ -213,19 +229,38 @@ impl Alglobo {
                 0,
             );
             let message = Message::new(kind, body);
-            let mut service_stream = service_streams.get_key_value(&operation.service).unwrap().1;
-            service_stream
-                .write_all(message.serialize().as_bytes())
-                .unwrap();
+            match service_streams.get_key_value(&operation.service) {
+                Some(entry) => {
+                    let mut service_stream = entry.1;
+                    service_stream
+                        .write_all(message.serialize().as_bytes())
+                        .unwrap_or_else(|_| {
+                            println!(
+                                "ALGLOBO <{}>: couldnt send message to {}",
+                                self.id, &operation.service
+                            )
+                        });
+                    let mut reader =
+                        BufReader::new(service_stream.try_clone().unwrap_or_else(|_| {
+                            panic!("ALGLOBO <{}>: could not clone stream", self.id)
+                        }));
+                    let mut buffer = String::new();
+                    reader.read_line(&mut buffer).unwrap_or_else(|_| {
+                        panic!(
+                            "ALGLOBO <{}>: could read incomming message from {}",
+                            self.id, &operation.service
+                        )
+                    });
 
-            let mut reader =
-                BufReader::new(service_stream.try_clone().expect("could not clone stream"));
-            let mut buffer = String::new();
-            reader.read_line(&mut buffer).unwrap();
-
-            if !buffer.is_empty() {
-                let incoming_message = deserialize(buffer);
-                loglist.push(incoming_message.kind);
+                    if !buffer.is_empty() {
+                        let incoming_message = deserialize(buffer);
+                        loglist.push(incoming_message.kind);
+                    }
+                }
+                None => println!(
+                    "ALGLOBO <{}>: service {} not found",
+                    self.id, &operation.service
+                ),
             }
         }
         loglist
@@ -251,9 +286,4 @@ impl Alglobo {
             }
         }
     }
-}
-
-fn _clear_alglobo_files() {
-    File::create("transaction_log.txt").unwrap();
-    File::create("failed_transactions_log.txt").unwrap();
 }

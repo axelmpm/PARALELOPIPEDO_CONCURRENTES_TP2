@@ -15,7 +15,11 @@ impl Operation {
 pub fn parse_operation(str: String) -> Operation {
     let s = str.split(',').collect::<Vec<&str>>();
     Operation {
-        service: parse_kind(s[1].to_owned()).unwrap(),
-        amount: s[2].to_owned().parse::<u64>().unwrap(),
+        service: parse_kind(s[1].to_owned())
+            .unwrap_or_else(|_| panic!("OPERATION: INTERNAL ERRROR")),
+        amount: s[2]
+            .to_owned()
+            .parse::<u64>()
+            .unwrap_or_else(|_| panic!("OPERATION: INTERNAL ERRROR")),
     }
 }

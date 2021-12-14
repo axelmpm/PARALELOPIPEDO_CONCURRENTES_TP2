@@ -28,14 +28,20 @@ pub fn run() {
 
     match mode.as_ref() {
         "clear" => clear_files(),
-        "alglobo" => alglobo(args[2].parse::<u32>().unwrap()),
+        "alglobo" => alglobo(
+            args[2]
+                .parse::<u32>()
+                .unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR")),
+        ),
         "service" => service(args[2].clone()),
         _ => println!("invalid start mode"),
     }
 }
 
 fn service(kind: String) {
-    let service = Arc::new(Service::new(service_kind::parse_kind(kind).unwrap()));
+    let service = Arc::new(Service::new(
+        service_kind::parse_kind(kind).unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR")),
+    ));
     let (sender, receiver) = mpsc::channel();
 
     ctrlc::set_handler(move || {
@@ -48,9 +54,6 @@ fn service(kind: String) {
 }
 
 fn alglobo(id: u32) {
-    //let host = args[2].to_string();
-    //let port = args[3].parse::<i32>().unwrap();
-
     let (sender, receiver) = mpsc::channel();
 
     ctrlc::set_handler(move || {
@@ -75,13 +78,16 @@ fn alglobo_retry_mode(mut alglobo: Alglobo) {
         println!("Press [R] to retry a failed transaction");
         println!("Press [X] to exit");
 
-        match read_char_from_stdin().unwrap() {
+        match read_char_from_stdin().unwrap_or_else(|| panic!("LIB: INTERNAL ERRROR")) {
             'F' => {
                 alglobo.show_failed_transactions();
             }
             'R' => {
                 println!("input id to retry");
-                let id = read_char_from_stdin().unwrap().to_digit(10).unwrap();
+                let id = read_char_from_stdin()
+                    .unwrap_or_else(|| panic!("LIB: INTERNAL ERRROR"))
+                    .to_digit(10)
+                    .unwrap_or_else(|| panic!("LIB: INTERNAL ERRROR"));
                 if alglobo.retry(id as i32) {
                     println!("success in retry!");
                 } else {
@@ -101,15 +107,17 @@ fn alglobo_retry_mode(mut alglobo: Alglobo) {
 
 fn read_char_from_stdin() -> Option<char> {
     let mut input = String::new();
-    io::stdin().read_line(&mut input).unwrap();
+    io::stdin()
+        .read_line(&mut input)
+        .unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
     input = input.to_uppercase();
     return input.chars().next();
 }
 
 fn clear_files() {
-    File::create("airline.txt").unwrap();
-    File::create("hotel.txt").unwrap();
-    File::create("bank.txt").unwrap();
-    File::create("transaction_log.txt").unwrap();
-    File::create("failed_transactions_log.txt").unwrap();
+    File::create("airline.txt").unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
+    File::create("hotel.txt").unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
+    File::create("bank.txt").unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
+    File::create("transaction_log.txt").unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
+    File::create("failed_transactions_log.txt").unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR"));
 }

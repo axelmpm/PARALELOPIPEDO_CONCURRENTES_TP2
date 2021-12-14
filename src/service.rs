@@ -23,7 +23,8 @@ impl Service {
         let logger = Arc::new(Mutex::new(Logger::new(kind.to_string() + ".txt")));
         Service {
             kind,
-            listener: TcpListener::bind(address).unwrap(),
+            listener: TcpListener::bind(address)
+                .unwrap_or_else(|_| panic!("SERVICE: {} couldn bind tcp conection", kind)),
             processor: Arc::new(Processor::new(logger.clone())),
             _logger: logger,
         }
@@ -39,7 +40,12 @@ impl Service {
             match stream {
                 Ok(stream) => self.handle_connection(stream, ctrlc_event.clone()),
                 Err(ref e) if e.kind() == WouldBlock => {
-                    if ctrlc_event.lock().unwrap().try_recv().is_ok() {
+                    if ctrlc_event
+                        .lock()
+                        .unwrap_or_else(|_| panic!("SERVICE: {} couldnt adquiere lock", self.kind))
+                        .try_recv()
+                        .is_ok()
+                    {
                         //received ctrlc
                         break;
                     }
@@ -62,12 +68,17 @@ impl Service {
                 Ok(line) => {
                     let message = deserialize(line);
                     let response = self.processor.process(message, self.kind);
-                    if let Err(_e) = stream.write_all(response.serialize().as_bytes()){
+                    if let Err(_e) = stream.write_all(response.serialize().as_bytes()) {
                         break;
                     }
                 }
                 Err(ref e) if e.kind() == WouldBlock => {
-                    if ctrlc_event.lock().unwrap().try_recv().is_ok() {
+                    if ctrlc_event
+                        .lock()
+                        .unwrap_or_else(|_| panic!("SERVICE: couldnt adquiere lock"))
+                        .try_recv()
+                        .is_ok()
+                    {
                         //received ctrlc
                         break;
                     }

@@ -23,10 +23,17 @@ impl MessageBody {
 pub fn body_parser(line: String) -> MessageBody {
     let params = line.split(',').collect::<Vec<&str>>();
     //println!("BODY PARSER: line = {}, params[0] = {}, params[1] = {}, params[2] = {}, params[3] = {}", line, params[0], params[1], params[2], params[3]);
-    let id = params[0].parse::<i32>().unwrap();
-    let amount = params[2].parse::<i32>().unwrap();
-    let total = params[3].parse::<i32>().unwrap();
-    let service = parse_kind(params[1].to_string()).unwrap();
+    let id = params[0]
+        .parse::<i32>()
+        .unwrap_or_else(|_| panic!("MESSAGE BODY: INTERNAL ERRROR"));
+    let amount = params[2]
+        .parse::<i32>()
+        .unwrap_or_else(|_| panic!("MESSAGE BODY: INTERNAL ERRROR"));
+    let total = params[3]
+        .parse::<i32>()
+        .unwrap_or_else(|_| panic!("MESSAGE BODY: INTERNAL ERRROR"));
+    let service = parse_kind(params[1].to_string())
+        .unwrap_or_else(|_| panic!("MESSAGE BODY: INTERNAL ERRROR"));
 
     MessageBody::new(id, service, amount, total)
 }
