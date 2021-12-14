@@ -14,7 +14,7 @@ pub struct Service {
     kind: ServiceKind,
     listener: TcpListener,
     processor: Arc<Processor>,
-    logger: Arc<Mutex<Logger>>,
+    _logger: Arc<Mutex<Logger>>,
 }
 
 impl Service {
@@ -25,7 +25,7 @@ impl Service {
             kind,
             listener: TcpListener::bind(address).unwrap(),
             processor: Arc::new(Processor::new(logger.clone())),
-            logger,
+            _logger: logger,
         };
     }
 
@@ -45,7 +45,7 @@ impl Service {
                     }
                     continue;
                 }
-                Err(e) => continue,
+                Err(_e) => continue,
             }
         }
     }
@@ -62,7 +62,7 @@ impl Service {
                 Ok(line) => {
                     let message = deserialize(line);
                     let response = self.processor.process(message, self.kind);
-                    if let Err(e) = stream.write_all(response.serialize().as_bytes()){
+                    if let Err(_e) = stream.write_all(response.serialize().as_bytes()){
                         break;
                     }
                 }

@@ -22,7 +22,6 @@ pub struct Alglobo {
     host: String,
     port: i32,
     id: u32,
-    service_streams: HashMap<ServiceKind, TcpStream>,
     failed_transactions: HashMap<i32, Arc<Transaction>>,
     failed_transaction_log: Logger,
     transaction_log: Logger,
@@ -32,13 +31,11 @@ impl Alglobo {
     pub fn new(host: String, port: i32, id: u32) -> Self {
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
         let failed_transaction_log = Logger::new("failed_transactions_log.txt".to_owned());
-        let service_streams = HashMap::new();
 
         return Alglobo {
             host,
             port,
             id,
-            service_streams,
             failed_transactions: HashMap::new(),
             failed_transaction_log,
             transaction_log,
@@ -50,8 +47,8 @@ impl Alglobo {
             let transaction = self
                 .failed_transactions
                 .get(&id)
-                .unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR"));
-            if self.connect_and_process_transaction(transaction.clone(), TransactionPhase::Init) {
+                .unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR")).clone();
+            if self.connect_and_process_transaction(transaction, TransactionPhase::Init) {
                 self.failed_transactions.remove_entry(&id).unwrap();
             }
         } else {
@@ -64,11 +61,11 @@ impl Alglobo {
         let ctrlc_pressed = Arc::new(Mutex::new(false));
         let ctrlc_pressed_copy = ctrlc_pressed.clone();
 
-        let mut transaction_parser = Arc::new(Mutex::new(TransactionParser::new("transactions.txt".to_owned())));
+        let transaction_parser = Arc::new(Mutex::new(TransactionParser::new("transactions.txt".to_owned())));
 
         let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, self.id); //todo get id from somewhere
         let leader_clone = leader_election.clone();
-        let leader_thread = thread::spawn(move || leader_clone.ping_control());
+        let _leader_thread = thread::spawn(move || leader_clone.ping_control());
 
         if leader_election.am_i_leader() {
             self.init_new_leader(transaction_parser.clone());
@@ -104,14 +101,14 @@ impl Alglobo {
         return forced || !leader;
     }
 
-    fn init_new_leader(&mut self, mut transaction_parser: Arc<Mutex<TransactionParser>>){
+    fn init_new_leader(&mut self, transaction_parser: Arc<Mutex<TransactionParser>>){
         self.transaction_log.init(); //idempotente
         self.failed_transaction_log.init(); //idempotente
 
         self.retrieve_failed_transactions();
 
         // Continue with transaction left from last leader
-        let mut last_processed_transaction = TransactionLogParser::new().get_last_transaction();
+        let last_processed_transaction = TransactionLogParser::new().get_last_transaction();
 
         if let Some((id, phase)) = last_processed_transaction {
             if let Some(transaction) = transaction_parser.lock().expect("poisoned!").seek_transaction(id) {
@@ -256,7 +253,7 @@ impl Alglobo {
     }
 }
 
-fn clear_alglobo_files() {
+fn _clear_alglobo_files() {
     File::create("transaction_log.txt").unwrap();
     File::create("failed_transactions_log.txt").unwrap();
 }
