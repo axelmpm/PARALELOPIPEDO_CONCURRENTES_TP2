@@ -1,9 +1,0 @@
-4,hotel,5,3
-4,airline,10,3
-4,bank,7,3
-7,hotel,5,3
-7,airline,10,3
-7,bank,7,3
-9,hotel,5,3
-9,airline,10,3
-9,bank,7,3
