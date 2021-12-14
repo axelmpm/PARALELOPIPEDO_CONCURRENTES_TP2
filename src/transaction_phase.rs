@@ -22,7 +22,6 @@ pub fn encode(msg: TransactionPhase) -> String {
       TransactionPhase::Init => "INIT".to_string(),
       TransactionPhase::Commit => "COMMIT".to_string(),
       TransactionPhase::Abort => "ABORT".to_string(),
-      _ => "".to_string() ,
   }
 }
 

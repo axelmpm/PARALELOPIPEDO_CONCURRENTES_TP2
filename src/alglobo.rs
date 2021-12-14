@@ -24,6 +24,7 @@ pub struct Alglobo {
     id: u32,
     service_streams: HashMap<ServiceKind, TcpStream>,
     failed_transactions: HashMap<i32, Arc<Transaction>>,
+    failed_transaction_log: Logger,
     transaction_log: Logger,
 }
 
@@ -32,9 +33,10 @@ impl Alglobo {
     pub fn new(host: String, port: i32, id:u32) -> Self {
 
         let transaction_log = Logger::new("transaction_log.txt".to_owned());
-        let mut service_streams = HashMap::new();
+        let failed_transaction_log = Logger::new("failed_transactions_log.txt".to_owned());
+        let service_streams = HashMap::new();
 
-        return Alglobo{host, port, id, service_streams, failed_transactions: HashMap::new(), transaction_log};
+        return Alglobo{host, port, id, service_streams, failed_transactions: HashMap::new(), failed_transaction_log, transaction_log};
     }
 
     pub fn retry(&mut self, id: i32) -> bool{
@@ -73,6 +75,9 @@ impl Alglobo {
                 leader_election.wait_until_leader_changes();
 
                 if leader_election.am_i_leader() {
+
+                    self.retrieve_failed_transactions();
+
                     // Continue with transcation left from last leader
                     last_processed_transaction = TransactionLogParser::new().get_last_transaction();
 
@@ -121,9 +126,14 @@ impl Alglobo {
                 }
             }
             TransactionPhase::Abort => {
-                self.transaction_log.write_line(format!("ABORT {}", transaction.id));
-                self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
-                self.process_operations(transaction, MessageKind::Rejection, &service_streams);
+                let id = transaction.id;
+                let transaction_cpy = transaction.clone();
+                let transaction_cpy2 = transaction.clone();
+
+                self.transaction_log.write_line(format!("ABORT {}", id));
+                self.failed_transaction_log.log_transaction(transaction);
+                self.failed_transactions.entry(id).or_insert_with(|| transaction_cpy);
+                self.process_operations(transaction_cpy2, MessageKind::Rejection, &service_streams);
                 return false;
             }
             TransactionPhase::Commit => {
@@ -153,6 +163,14 @@ impl Alglobo {
             }
         }
         return loglist;
+    }
+
+    pub fn retrieve_failed_transactions(&mut self) {
+        let mut transaction_parser = TransactionParser::new("failed_transactions_log.txt".to_owned());
+
+        while let Some(transaction) = transaction_parser.read_transaction() {
+            self.failed_transactions.entry(transaction.id).or_insert_with(|| Arc::new(transaction));
+        }
     }
 
     pub fn show_failed_transactions(&self){

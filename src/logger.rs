@@ -3,6 +3,8 @@ use std::io::prelude::*;
 use std::fs::File;
 use std::time::Instant;
 use crate::message_body::MessageBody;
+use crate::transaction::Transaction;
+use std::sync::Arc;
 
 
 pub struct Logger {
@@ -42,6 +44,13 @@ impl Logger {
         )
         .expect("LOGGER: Couldn't log to file");
 
-        println!("{}", line);
+        //println!("{}", line);
+    }
+
+    pub fn log_transaction(&mut self, transaction: Arc<Transaction>) {
+        let total = transaction.operations.len();
+        for operation in &transaction.operations{
+            self.write_line(format!("{},{},{},{}", transaction.id, operation.service, operation.amount, total));
+        }
     }
 }
