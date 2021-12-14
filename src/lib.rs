@@ -61,7 +61,7 @@ fn alglobo(id :u32){
     })
     .expect("Error setting Ctrl-C handler");
 
-    let mut alglobo = Alglobo::new("localhost".to_string(), 9000, id);
+    let mut alglobo = Alglobo::new("localhost".to_string(), 10000, id);
     let exit = alglobo.process(Arc::new(Mutex::new(receiver)));
     if !exit{
         alglobo_retry_mode(alglobo);

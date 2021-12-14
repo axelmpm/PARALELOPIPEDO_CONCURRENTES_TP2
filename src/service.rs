@@ -70,7 +70,10 @@ impl Service {
                     continue;
                 },
 
-                Err(e) => panic!("{}", e),
+                Err(e) => {
+                    println!("{}", e);
+                    break;
+                },
             }
         }
     }

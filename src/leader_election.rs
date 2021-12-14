@@ -110,7 +110,7 @@ impl LeaderElection {
         } else {
             //if no ok arrived then proclaim myself as leader
             println!("IM LEADER {}", self.id);
-            *self.current_leader.0.lock().unwrap() = Some(self.id);
+            self.make_leader(self.id);
             println!("PROCLAIMING LEADER {}", self.id);
             self.send_leader_proclamation();
         }
@@ -129,22 +129,27 @@ impl LeaderElection {
             } else {
                 self.ping_sock.set_read_timeout(TIMEOUT);
                 self.ping_sock.send_to(&self.id_to_msg(b'P'), to_pingaddr(self.host.clone(), self.port, lid));
+                thread::sleep(Duration::from_millis(1000));
             }
 
-            if let Ok((size, from)) = self.ping_sock.recv_from(&mut buf) {
-                self.process_message(buf[0], u32::from_le_bytes(buf[1..].try_into().unwrap()), from);
-                thread::sleep(Duration::from_millis(1000));
-            } else { //timeout or error
-                println!("ERROR! ELECTION {}", self.id);
-                self.elect_new_leader();
+             match self.ping_sock.recv_from(&mut buf) {
+                 Ok((size, from)) => {
+                    self.process_message(buf[0], u32::from_le_bytes(buf[1..].try_into().unwrap()), from);
+                 },
+                 Err(e) => { //timeout or error
+                     self.elect_new_leader();
+                 }
             }
         }
         println!("IM DONE WITH PINGS ");
     }
 
-    pub fn close(&self){
-        self.send_close();
+    pub fn close(&self, tell_others: bool){
+        if tell_others {
+            self.send_close();
+        }
         *self.finished.lock().unwrap() = true;
+        self.sock.send_to(&self.id_to_msg(b'X'), to_pingaddr(self.host.clone(), self.port, self.id));
     }
 
     pub fn am_i_leader(&self)->bool {
@@ -152,7 +157,7 @@ impl LeaderElection {
     }
 
     pub fn wait_until_leader_changes(&self){
-         self.leader_changed.1.wait_timeout_while(self.leader_changed.0.lock().unwrap(), TIMEOUT.unwrap(), |changed| !*changed );
+         self.leader_changed.1.wait_while(self.leader_changed.0.lock().unwrap(), |changed| !*changed );
         *self.leader_changed.0.lock().unwrap() = false;
     }
 
@@ -178,6 +183,8 @@ impl LeaderElection {
             b'L' => {
                 println!("GOT {} AS LEADER", id_from);
                 self.make_leader(id_from);
+                let addr2 = to_pingaddr( self.host.clone(), self.port , self.id);
+                self.sock.send_to(&self.id_to_msg(b'Z'), addr2);//wake up
             },//update leader condvar and leader id value//new leader
             b'O' => {
                 *self.got_ok.0.lock().unwrap() = true;
@@ -185,6 +192,7 @@ impl LeaderElection {
             },//update OK condvar
             b'X' => {
                 //close signal recv
+                println!("GOT CLOSE FROM {}", id_from);
                 *self.finished.lock().unwrap() = true;
                 self.make_leader(self.id);
             }
@@ -214,7 +222,7 @@ impl LeaderElection {
                 let addr = to_workaddr( self.host.clone(), self.port , i);
                 let addr2 = to_pingaddr( self.host.clone(), self.port , i);
                 self.sock.send_to(&self.id_to_msg(b'X'), addr);
-                self.ping_sock.send_to(&self.id_to_msg(b'X'), addr2);
+                self.sock.send_to(&self.id_to_msg(b'X'), addr2);
             }
         }
     }

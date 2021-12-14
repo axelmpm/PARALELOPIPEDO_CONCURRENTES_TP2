@@ -64,7 +64,6 @@ impl Alglobo {
         loop {
             if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
                 *ctrlc_pressed_copy.lock().unwrap() = true;
-                leader_election.close();
                 break;
             }
             else if !leader_election.am_i_leader() {
@@ -90,8 +89,9 @@ impl Alglobo {
                 break; // no more transacitions
             }
         }
-        leader_election.close();
-        return *ctrlc_pressed.lock().unwrap();
+        let forced = *ctrlc_pressed.lock().unwrap();
+        leader_election.close(!forced);
+        return forced;
     }
 
     fn connect_and_process_transaction(&mut self, transaction: Arc<Transaction>, phase: TransactionPhase) -> bool{
