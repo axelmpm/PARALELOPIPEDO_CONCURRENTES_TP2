@@ -8,6 +8,7 @@ use crate::processor::rand::Rng;
 use core::time::Duration;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use crate::service_kind::ServiceKind;
 
 pub struct Processor {
     storage: Mutex<PendingStorage>,
@@ -22,14 +23,14 @@ impl Processor {
         }
     }
 
-    pub fn process(&self, message: Message) -> Message {
+    pub fn process(&self, message: Message, service: ServiceKind) -> Message {
         match message.kind.clone() {
             // Esto sería equivalente a un COMMIT
             MessageKind::Confirmation => {
                 self.logger
                     .lock()
                     .unwrap()
-                    .write_line(format!("COMMIT {}", message.body.id.to_string()));
+                    .write_line(format!("{} COMMIT {}", service.to_string(), message.body.id.to_string()));
                 return Message::new(MessageKind::Ack, message.body);
                 // accept from pending storage
             }
@@ -39,7 +40,7 @@ impl Processor {
                 self.logger
                     .lock()
                     .unwrap()
-                    .write_line(format!("ABORT {}", message.body.id.to_string()));
+                    .write_line(format!("{} ABORT {}", service.to_string(), message.body.id.to_string()));
                 return Message::new(MessageKind::Ack, message.body);
                 // reject from pending storage
             }
@@ -60,7 +61,7 @@ impl Processor {
                     self.logger
                         .lock()
                         .unwrap()
-                        .write_line(format!("ACCEPTED {}", message.body.id.to_string()));
+                        .write_line(format!("{} ACCEPTED {}", service.to_string(), message.body.id.to_string()));
                     return Message::new(MessageKind::Confirmation, message.body);
                 } else {
                     //rejected
@@ -68,7 +69,7 @@ impl Processor {
                     self.logger
                         .lock()
                         .unwrap()
-                        .write_line(format!("REJECTED {}", message.body.id.to_string()));
+                        .write_line(format!("{} REJECTED {}", service.to_string(), message.body.id.to_string()));
                     return Message::new(MessageKind::Rejection, message.body);
                 }
             }

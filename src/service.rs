@@ -61,8 +61,10 @@ impl Service {
             match line {
                 Ok(line) => {
                     let message = deserialize(line);
-                    let response = self.processor.process(message);
-                    stream.write_all(response.serialize().as_bytes()).unwrap();
+                    let response = self.processor.process(message, self.kind);
+                    if let Err(e) = stream.write_all(response.serialize().as_bytes()){
+                        break;
+                    }
                 }
                 Err(ref e) if e.kind() == WouldBlock => {
                     if ctrlc_event.lock().unwrap().try_recv().is_ok() {

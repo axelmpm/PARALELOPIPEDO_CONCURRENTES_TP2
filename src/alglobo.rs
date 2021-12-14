@@ -64,16 +64,14 @@ impl Alglobo {
         let ctrlc_pressed = Arc::new(Mutex::new(false));
         let ctrlc_pressed_copy = ctrlc_pressed.clone();
 
-        let mut transaction_parser = TransactionParser::new("transactions.txt".to_owned());
+        let mut transaction_parser = Arc::new(Mutex::new(TransactionParser::new("transactions.txt".to_owned())));
 
         let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, self.id); //todo get id from somewhere
         let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || leader_clone.ping_control());
-        let mut last_processed_transaction: Option<(i32, TransactionPhase)>;
 
         if leader_election.am_i_leader() {
-            self.transaction_log.init(); //idempotente
-            self.failed_transaction_log.init(); //idempotente
+            self.init_new_leader(transaction_parser.clone());
         }
 
         loop {
@@ -91,21 +89,9 @@ impl Alglobo {
                 }
 
                 if leader_election.am_i_leader() {
-                    self.transaction_log.init(); //idempotente
-                    self.failed_transaction_log.init(); //idempotente
-
-                    self.retrieve_failed_transactions();
-
-                    // Continue with transaction left from last leader
-                    last_processed_transaction = TransactionLogParser::new().get_last_transaction();
-
-                    if let Some((id, phase)) = last_processed_transaction {
-                        if let Some(transaction) = transaction_parser.seek_transaction(id) {
-                            self.connect_and_process_transaction(Arc::new(transaction), phase);
-                        }
-                    }
+                   self.init_new_leader(transaction_parser.clone());
                 }
-            } else if let Some(transaction) = transaction_parser.read_transaction() {
+            } else if let Some(transaction) = transaction_parser.lock().expect("poisoned!").read_transaction() {
                 self.connect_and_process_transaction(Arc::new(transaction), TransactionPhase::Init);
             } else {
                 println!("finished processing transactions");
@@ -113,8 +99,25 @@ impl Alglobo {
             }
         }
         let forced = *ctrlc_pressed.lock().unwrap();
+        let leader = leader_election.am_i_leader();
         leader_election.close(!forced);
-        return forced || !leader_election.am_i_leader();
+        return forced || !leader;
+    }
+
+    fn init_new_leader(&mut self, mut transaction_parser: Arc<Mutex<TransactionParser>>){
+        self.transaction_log.init(); //idempotente
+        self.failed_transaction_log.init(); //idempotente
+
+        self.retrieve_failed_transactions();
+
+        // Continue with transaction left from last leader
+        let mut last_processed_transaction = TransactionLogParser::new().get_last_transaction();
+
+        if let Some((id, phase)) = last_processed_transaction {
+            if let Some(transaction) = transaction_parser.lock().expect("poisoned!").seek_transaction(id) {
+                self.connect_and_process_transaction(Arc::new(transaction), phase);
+            }
+        }
     }
 
     fn connect_and_process_transaction(
