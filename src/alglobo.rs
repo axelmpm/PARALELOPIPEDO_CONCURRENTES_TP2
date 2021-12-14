@@ -73,6 +73,11 @@ impl Alglobo {
 
                 leader_election.wait_until_leader_changes();
 
+                if leader_election.is_done(){
+                    println!("is_done()");
+                    break;
+                }
+
                 if leader_election.am_i_leader() {
 
                     self.retrieve_failed_transactions();
@@ -96,7 +101,7 @@ impl Alglobo {
         }
         let forced = *ctrlc_pressed.lock().unwrap();
         leader_election.close(!forced);
-        return forced;
+        return forced && leader_election.am_i_leader();
     }
 
     fn connect_and_process_transaction(&mut self, transaction: Arc<Transaction>, phase: TransactionPhase) -> bool{

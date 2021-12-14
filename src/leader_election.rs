@@ -9,6 +9,7 @@ use std::net::SocketAddr;
 pub const N_NODES: u32 = 5;
 const TIME: u64 = 1500;
 const TIMEOUT: Option<Duration> = Some(Duration::from_millis(TIME));
+const NON_LEADER_ID :u32 = u32::MAX;
 
 pub struct LeaderElection{
     id: u32,
@@ -168,7 +169,7 @@ impl LeaderElection {
     fn process_message(&self, msg: u8, id_from:u32, src: SocketAddr) {
         match msg {
             b'P' => {
-                println!("GOT PING FROM {}", id_from);
+                //println!("GOT PING FROM {}", id_from);
                 self.ping_sock.send_to(&self.id_to_msg(b'Z'), src);
             },
             b'E' => {//call to elections
@@ -194,7 +195,7 @@ impl LeaderElection {
                 //close signal recv
                 println!("GOT CLOSE FROM {}", id_from);
                 *self.finished.lock().unwrap() = true;
-                self.make_leader(self.id);
+                self.make_leader(NON_LEADER_ID); //TODO medio dudoso 
             }
             _ => {}
         }

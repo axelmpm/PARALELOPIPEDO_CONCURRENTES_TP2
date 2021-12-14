@@ -20,9 +20,10 @@ impl TransactionLogParser {
   pub fn get_last_transaction(&self) -> Option<(i32,TransactionPhase)> {
     let file = BufReader::new(File::open("transaction_log.txt").unwrap());
     let mut lines: Vec<_> = file.lines().map(|line| { line.unwrap() }).collect();
-    lines.reverse();
+    let n = lines.len();
+    //lines.reverse();
 
-    if let Some(line) = lines.first() {
+    if let Some(line) = lines.last() {
       return Some(self.parse_log_line(line.to_string()))
     };
 

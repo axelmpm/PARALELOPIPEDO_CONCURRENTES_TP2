@@ -44,14 +44,14 @@ impl Service {
                     }
                     continue;
                 },
-                Err(e) => panic!("{}", e),
+                Err(e) => continue,
             }
         }
 
     }
 
     fn handle_connection(&self, mut stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>){
-        println!("new connection");
+        //println!("new connection");
 
         stream.set_nonblocking(true).expect("Cannot set non-blocking");
         let reader = BufReader::new(stream.try_clone().expect("could not clone stream"));
