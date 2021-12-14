@@ -11,6 +11,8 @@ pub mod transaction_parser;
 pub mod operation;
 pub mod transaction;
 pub mod leader_election;
+pub mod transaction_log_parser;
+pub mod transaction_phase;
 
 use std::env;
 

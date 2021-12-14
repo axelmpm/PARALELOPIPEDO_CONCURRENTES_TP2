@@ -1,11 +1,10 @@
 use std::net::UdpSocket;
-use std::sync::{Mutex, Arc, Condvar, mpsc};
+use std::sync::{Mutex, Arc, Condvar};
 use std::time::Duration;
 use std::thread;
 use std::convert::TryInto;
 use std::mem::size_of;
 use std::net::SocketAddr;
-use std::sync::mpsc::{Sender, Receiver};
 
 pub const N_NODES: u32 = 5;
 const TIME: u64 = 1500;

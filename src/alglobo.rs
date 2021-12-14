@@ -3,7 +3,9 @@ use crate::message_body::MessageBody;
 use crate::message::{Message, deserialize};
 use crate::message_kind::MessageKind;
 use crate::logger::Logger;
+use crate::transaction_log_parser::TransactionLogParser;
 use crate::transaction_parser::TransactionParser;
+use crate::transaction_phase::TransactionPhase;
 use std::net::{TcpStream};
 use std::io::Write;
 use std::io::BufReader;
@@ -38,7 +40,7 @@ impl Alglobo {
     pub fn retry(&mut self, id: i32) -> bool{
         if self.failed_transactions.contains_key(&id) {
             let transaction = self.failed_transactions.get(&id).unwrap_or_else(|| panic!("ALGLOBO: INTERNAL ERROR"));
-            if self.process_transaction(transaction.clone(), HashMap::new()){
+            if self.connect_and_process_transaction(transaction.clone(), TransactionPhase::Init){
                 self.failed_transactions.remove_entry(&id).unwrap();
             }
         } else {
@@ -57,6 +59,7 @@ impl Alglobo {
         let leader_election = LeaderElection::new(self.host.clone(), self.port as u32, self.id); //todo get id from somewhere
         let leader_clone = leader_election.clone();
         let leader_thread = thread::spawn(move || leader_clone.ping_control());
+        let mut last_processed_transaction: Option<(i32, TransactionPhase)>;
 
         loop {
             if ctrlc_event.lock().unwrap().try_recv().is_ok() { //received ctrlc
@@ -69,17 +72,19 @@ impl Alglobo {
 
                 leader_election.wait_until_leader_changes();
 
+                if leader_election.am_i_leader() {
+                    // Continue with transcation left from last leader
+                    last_processed_transaction = TransactionLogParser::new().get_last_transaction();
+
+                    if let Some((id, phase)) = last_processed_transaction {
+                        if let Some(transaction) = transaction_parser.seek_transaction(id) {
+                            self.connect_and_process_transaction(Arc::new(transaction), phase);
+                        }
+                    }
+                }
+
             } else if let Some(transaction) = transaction_parser.read_transaction() {        
-                let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
-                let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
-                let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
-                let mut service_streams = HashMap::new();
-                service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
-                service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
-                service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
-
-
-                self.process_transaction(Arc::new(transaction), service_streams);
+                self.connect_and_process_transaction(Arc::new(transaction), TransactionPhase::Init);
 
             } else{
                 break; // no more transacitions
@@ -89,20 +94,43 @@ impl Alglobo {
         return *ctrlc_pressed.lock().unwrap();
     }
 
-    fn process_transaction(&mut self, transaction: Arc<Transaction>, service_streams: HashMap<ServiceKind, TcpStream>) -> bool{
+    fn connect_and_process_transaction(&mut self, transaction: Arc<Transaction>, phase: TransactionPhase) -> bool{
 
-        self.transaction_log.write_line(format!("INIT {}", transaction.id));
-        let responses = self.process_operations(transaction.clone(), MessageKind::Transaction, &service_streams);
+        let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
+        let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
+        let airline_address: String = format!("localhost:{}", kind_address(ServiceKind::Airline));
+        let mut service_streams = HashMap::new();
+        service_streams.insert(ServiceKind::Hotel, TcpStream::connect(hotel_address).expect("No fue posible conectarse a servicio de Hotel"));
+        service_streams.insert(ServiceKind::Bank, TcpStream::connect(bank_address).expect("No fue posible conectarse a servicio de Banco"));
+        service_streams.insert(ServiceKind::Airline, TcpStream::connect(airline_address).expect("No fue posible conectarse a servicio de Aerolinea"));
 
-        if responses.contains(&MessageKind::Rejection) {
-            self.transaction_log.write_line(format!("ABORT {}", transaction.id));
-            self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
-            self.process_operations(transaction, MessageKind::Rejection, &service_streams);
-            return false;
-        } else {
-            self.transaction_log.write_line(format!("COMMIT {}", transaction.id));
-            self.process_operations(transaction, MessageKind::Confirmation, &service_streams);
-            return true;
+        return self.process_transaction(transaction, service_streams, phase);
+    }
+
+    fn process_transaction(&mut self, transaction: Arc<Transaction>, service_streams: HashMap<ServiceKind, TcpStream>, phase: TransactionPhase) -> bool{
+
+        match phase {
+            TransactionPhase::Init => {
+                self.transaction_log.write_line(format!("INIT {}", transaction.id));
+                let responses = self.process_operations(transaction.clone(), MessageKind::Transaction, &service_streams);
+
+                if responses.contains(&MessageKind::Rejection) {
+                    return self.process_transaction(transaction, service_streams, TransactionPhase::Abort);
+                } else {
+                    return self.process_transaction(transaction, service_streams, TransactionPhase::Commit);
+                }
+            }
+            TransactionPhase::Abort => {
+                self.transaction_log.write_line(format!("ABORT {}", transaction.id));
+                self.failed_transactions.entry(transaction.id).or_insert_with(|| transaction.clone());
+                self.process_operations(transaction, MessageKind::Rejection, &service_streams);
+                return false;
+            }
+            TransactionPhase::Commit => {
+                self.transaction_log.write_line(format!("COMMIT {}", transaction.id));
+                self.process_operations(transaction, MessageKind::Confirmation, &service_streams);
+                return true;
+            }
         }
     }
 
