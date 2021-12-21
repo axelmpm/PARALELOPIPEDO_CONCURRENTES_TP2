@@ -33,11 +33,11 @@ impl ServiceStream {
 
     pub fn connect_n_recv(&self) -> Option<String> {
         if let Some(stream) = self.connect() {
+            stream.set_read_timeout(Some(Duration::from_millis(500))).expect("could not set timeout");
             let mut reader = BufReader::new(stream.try_clone().unwrap_or_else(|_| {
                     panic!("ALGLOBO: could not clone stream")
                 }));
             let mut buffer = String::new();
-            stream.set_read_timeout(Some(Duration::from_millis(500))).expect("could not set timeout");
             match reader.read_line(&mut buffer) {
                 Ok(_) => {
                     return Some(buffer);
