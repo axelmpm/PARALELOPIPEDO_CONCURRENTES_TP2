@@ -13,6 +13,7 @@ pub mod transaction;
 pub mod transaction_log_parser;
 pub mod transaction_parser;
 pub mod transaction_phase;
+mod service_stream;
 
 use std::env;
 
@@ -39,9 +40,9 @@ pub fn run() {
 }
 
 fn service(kind: String) {
-    let service = Arc::new(Service::new(
+    let mut service = Service::new(
         service_kind::parse_kind(kind).unwrap_or_else(|_| panic!("LIB: INTERNAL ERRROR")),
-    ));
+    );
     let (sender, receiver) = mpsc::channel();
 
     ctrlc::set_handler(move || {

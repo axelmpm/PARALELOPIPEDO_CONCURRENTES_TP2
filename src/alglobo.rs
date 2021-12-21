@@ -9,13 +9,10 @@ use crate::transaction_log_parser::TransactionLogParser;
 use crate::transaction_parser::TransactionParser;
 use crate::transaction_phase::TransactionPhase;
 use std::collections::HashMap;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Write;
-use std::net::TcpStream;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use crate::service_stream::ServiceStream;
 
 pub struct Alglobo {
     host: String,
@@ -48,7 +45,7 @@ impl Alglobo {
                 .get(&id)
                 .unwrap_or_else(|| panic!("ALGLOBO <{}>: INTERNAL ERROR", self.id))
                 .clone();
-            if self.connect_and_process_transaction(transaction, TransactionPhase::Init) {
+            if self.connect_and_process_transaction(transaction, TransactionPhase::Init, true) {
                 self.failed_transactions
                     .remove_entry(&id)
                     .unwrap_or_else(|| {
@@ -108,7 +105,7 @@ impl Alglobo {
                 .expect("poisoned!")
                 .read_transaction()
             {
-                self.connect_and_process_transaction(Arc::new(transaction), TransactionPhase::Init);
+                self.connect_and_process_transaction(Arc::new(transaction), TransactionPhase::Init, false);
             } else {
                 break; // no more transacitions
             }
@@ -136,7 +133,7 @@ impl Alglobo {
                 .expect("poisoned!")
                 .seek_transaction(id)
             {
-                self.connect_and_process_transaction(Arc::new(transaction), phase);
+                self.connect_and_process_transaction(Arc::new(transaction), phase, false);
             }
         }
     }
@@ -145,6 +142,7 @@ impl Alglobo {
         &mut self,
         transaction: Arc<Transaction>,
         phase: TransactionPhase,
+        is_retry: bool
     ) -> bool {
         let hotel_address = format!("localhost:{}", kind_address(ServiceKind::Hotel));
         let bank_address: String = format!("localhost:{}", kind_address(ServiceKind::Bank));
@@ -152,43 +150,42 @@ impl Alglobo {
         let mut service_streams = HashMap::new();
         service_streams.insert(
             ServiceKind::Hotel,
-            TcpStream::connect(hotel_address)
-                .expect("No fue posible conectarse a servicio de Hotel"),
+            ServiceStream::new(hotel_address),
         );
         service_streams.insert(
             ServiceKind::Bank,
-            TcpStream::connect(bank_address)
-                .expect("No fue posible conectarse a servicio de Banco"),
+            ServiceStream::new(bank_address),
         );
         service_streams.insert(
             ServiceKind::Airline,
-            TcpStream::connect(airline_address)
-                .expect("No fue posible conectarse a servicio de Aerolinea"),
+            ServiceStream::new(airline_address),
         );
 
-        self.process_transaction(transaction, service_streams, phase)
+        self.process_transaction(transaction, service_streams, phase, is_retry)
     }
 
     fn process_transaction(
         &mut self,
         transaction: Arc<Transaction>,
-        service_streams: HashMap<ServiceKind, TcpStream>,
+        service_streams: HashMap<ServiceKind, ServiceStream>,
         phase: TransactionPhase,
+        is_retry: bool
     ) -> bool {
         match phase {
             TransactionPhase::Init => {
                 self.transaction_log
                     .write_line(format!("INIT {} alglobo <{}>", transaction.id, self.id));
+                let message_kind = if is_retry { MessageKind::Retry } else { MessageKind::Transaction };                
                 let responses = self.process_operations(
                     transaction.clone(),
-                    MessageKind::Transaction,
+                    message_kind,
                     &service_streams,
                 );
 
                 if responses.contains(&MessageKind::Rejection) {
-                    self.process_transaction(transaction, service_streams, TransactionPhase::Abort)
+                    self.process_transaction(transaction, service_streams, TransactionPhase::Abort, is_retry)
                 } else {
-                    self.process_transaction(transaction, service_streams, TransactionPhase::Commit)
+                    self.process_transaction(transaction, service_streams, TransactionPhase::Commit, is_retry)
                 }
             }
             TransactionPhase::Abort => {
@@ -215,10 +212,10 @@ impl Alglobo {
     }
 
     fn process_operations(
-        &self,
+        &mut self,
         transaction: Arc<Transaction>,
         kind: MessageKind,
-        service_streams: &HashMap<ServiceKind, TcpStream>,
+        service_streams: &HashMap<ServiceKind, ServiceStream>,
     ) -> Vec<MessageKind> {
         let mut loglist = vec![];
         for operation in &transaction.operations {
@@ -231,30 +228,30 @@ impl Alglobo {
             let message = Message::new(kind, body);
             match service_streams.get_key_value(&operation.service) {
                 Some(entry) => {
-                    let mut service_stream = entry.1;
-                    service_stream
-                        .write_all(message.serialize().as_bytes())
-                        .unwrap_or_else(|_| {
-                            println!(
-                                "ALGLOBO <{}>: couldnt send message to {}",
-                                self.id, &operation.service
-                            )
-                        });
-                    let mut reader =
-                        BufReader::new(service_stream.try_clone().unwrap_or_else(|_| {
-                            panic!("ALGLOBO <{}>: could not clone stream", self.id)
-                        }));
-                    let mut buffer = String::new();
-                    reader.read_line(&mut buffer).unwrap_or_else(|_| {
-                        panic!(
-                            "ALGLOBO <{}>: could read incomming message from {}",
-                            self.id, &operation.service
-                        )
-                    });
+                    let mut service_stream = entry.1.clone();
+                    let stream_option = service_stream.connect();
 
-                    if !buffer.is_empty() {
-                        let incoming_message = deserialize(buffer);
-                        loglist.push(incoming_message.kind);
+                    if let Some(stream) = stream_option {
+                        let send_stream = stream.try_clone().unwrap();
+                        if !service_stream.connect_n_send(message, send_stream) { //asume rejection
+                            loglist.push(MessageKind::Rejection);
+                            continue;
+                        }
+
+                        match entry.1.connect_n_recv(stream) {
+                            Some(buffer) => {
+                                if !buffer.is_empty() {
+                                    let incoming_message = deserialize(buffer);
+                                    loglist.push(incoming_message.kind);
+                                }
+                            },
+                            None => { //asume rejection
+                                loglist.push(MessageKind::Rejection);
+                                continue;
+                            }
+                        }
+                    } else {
+                        loglist.push(MessageKind::Rejection);
                     }
                 }
                 None => println!(
