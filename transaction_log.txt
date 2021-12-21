@@ -1,1 +1,6 @@
-INIT 1 alglobo <1> :: Instant { t: 1029297.808837364s }
+INIT 1 alglobo <1> :: Instant { t: 1186196.7976335s }
+COMMIT 1 alglobo <1> :: Instant { t: 1186199.0059462s }
+INIT 2 alglobo <1> :: Instant { t: 1186199.0125768s }
+ABORT 2 alglobo <1> :: Instant { t: 1186201.0195918s }
+INIT 3 alglobo <1> :: Instant { t: 1186201.0267108s }
+ABORT 3 alglobo <1> :: Instant { t: 1186203.9458053s }
