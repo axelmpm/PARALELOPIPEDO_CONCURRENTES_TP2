@@ -17,40 +17,32 @@ impl ServiceStream {
         }
     }
 
-    pub fn connect_n_send(&mut self, msg: Message) -> bool{
-        if let Some(mut stream) = self.connect(){
-            match stream.write_all(msg.serialize().as_bytes()) {
-                Ok(_) => {
-                    return true;
-                }
-                Err(_) => {
-                    return false;
-                }
+    pub fn connect_n_send(&mut self, msg: Message, mut stream: TcpStream) -> bool {
+        match stream.write_all(msg.serialize().as_bytes()) {
+            Ok(_) => {
+                true
+            }
+            Err(_) => {
+                return false
             }
         }
-        false
     }
 
-    pub fn connect_n_recv(&self) -> Option<String> {
-        if let Some(stream) = self.connect() {
-            stream.set_read_timeout(Some(Duration::from_millis(500))).expect("could not set timeout");
-            let mut reader = BufReader::new(stream.try_clone().unwrap_or_else(|_| {
-                    panic!("ALGLOBO: could not clone stream")
-                }));
-            let mut buffer = String::new();
-            match reader.read_line(&mut buffer) {
-                Ok(_) => {
-                    return Some(buffer);
-                }
-                Err(_) => {
-                    return None;
-                }
+    pub fn connect_n_recv(&self, stream: TcpStream) -> Option<String> {
+        stream.set_read_timeout(Some(Duration::from_millis(5000))).expect("could not set timeout");
+        let mut reader = BufReader::new(stream);
+        let mut buffer = String::new();
+        match reader.read_line(&mut buffer) {
+            Ok(_) => {
+                Some(buffer)
+            }
+            Err(e) => {
+                None
             }
         }
-        None
     }
 
-    fn connect(&self) -> Option<TcpStream> {
+    pub fn connect(&self) -> Option<TcpStream> {
         match TcpStream::connect(self.addr.clone()){
             Ok(stream) => Some(stream),
             Err(_e) => None

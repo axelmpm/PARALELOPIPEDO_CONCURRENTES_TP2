@@ -71,7 +71,8 @@ impl Service {
                 Ok(line) => {
                     let message = deserialize(line);
                     let response = self.processor.process(message, self.kind);
-                    if let Err(_e) = stream.write_all(response.serialize().as_bytes()) {
+                    if let Err(e) = stream.write_all(response.serialize().as_bytes()) {
+                        println!("{}", e);
                         break;
                     }
                 }

@@ -229,22 +229,29 @@ impl Alglobo {
             match service_streams.get_key_value(&operation.service) {
                 Some(entry) => {
                     let mut service_stream = entry.1.clone();
-                    if !service_stream.connect_n_send(message) { //asume rejection
-                        loglist.push(MessageKind::Rejection);
-                        continue;
-                    }
+                    let stream_option = service_stream.connect();
 
-                    match entry.1.connect_n_recv() {
-                        Some(buffer) => {
-                            if !buffer.is_empty() {
-                                let incoming_message = deserialize(buffer);
-                                loglist.push(incoming_message.kind);
-                            }
-                        },
-                        None => { //asume rejection
+                    if let Some(stream) = stream_option {
+                        let send_stream = stream.try_clone().unwrap();
+                        if !service_stream.connect_n_send(message, send_stream) { //asume rejection
                             loglist.push(MessageKind::Rejection);
                             continue;
                         }
+
+                        match entry.1.connect_n_recv(stream) {
+                            Some(buffer) => {
+                                if !buffer.is_empty() {
+                                    let incoming_message = deserialize(buffer);
+                                    loglist.push(incoming_message.kind);
+                                }
+                            },
+                            None => { //asume rejection
+                                loglist.push(MessageKind::Rejection);
+                                continue;
+                            }
+                        }
+                    } else {
+                        loglist.push(MessageKind::Rejection);
                     }
                 }
                 None => println!(
