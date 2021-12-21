@@ -13,6 +13,7 @@ pub mod transaction;
 pub mod transaction_log_parser;
 pub mod transaction_parser;
 pub mod transaction_phase;
+mod ServiceStream;
 
 use std::env;
 

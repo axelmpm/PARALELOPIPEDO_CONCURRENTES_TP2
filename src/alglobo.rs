@@ -16,6 +16,7 @@ use std::net::TcpStream;
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use crate::ServiceStream::ServiceStream;
 
 pub struct Alglobo {
     host: String,
@@ -152,18 +153,15 @@ impl Alglobo {
         let mut service_streams = HashMap::new();
         service_streams.insert(
             ServiceKind::Hotel,
-            TcpStream::connect(hotel_address)
-                .expect("No fue posible conectarse a servicio de Hotel"),
+            ServiceStream::new(hotel_address),
         );
         service_streams.insert(
             ServiceKind::Bank,
-            TcpStream::connect(bank_address)
-                .expect("No fue posible conectarse a servicio de Banco"),
+            ServiceStream::new(bank_address),
         );
         service_streams.insert(
             ServiceKind::Airline,
-            TcpStream::connect(airline_address)
-                .expect("No fue posible conectarse a servicio de Aerolinea"),
+            ServiceStream::new(airline_address),
         );
 
         self.process_transaction(transaction, service_streams, phase)
@@ -172,7 +170,7 @@ impl Alglobo {
     fn process_transaction(
         &mut self,
         transaction: Arc<Transaction>,
-        service_streams: HashMap<ServiceKind, TcpStream>,
+        service_streams: HashMap<ServiceKind, ServiceStream>,
         phase: TransactionPhase,
     ) -> bool {
         match phase {
@@ -218,7 +216,7 @@ impl Alglobo {
         &self,
         transaction: Arc<Transaction>,
         kind: MessageKind,
-        service_streams: &HashMap<ServiceKind, TcpStream>,
+        service_streams: &HashMap<ServiceKind, ServiceStream>,
     ) -> Vec<MessageKind> {
         let mut loglist = vec![];
         for operation in &transaction.operations {
@@ -232,14 +230,10 @@ impl Alglobo {
             match service_streams.get_key_value(&operation.service) {
                 Some(entry) => {
                     let mut service_stream = entry.1;
-                    service_stream
-                        .write_all(message.serialize().as_bytes())
-                        .unwrap_or_else(|_| {
-                            println!(
-                                "ALGLOBO <{}>: couldnt send message to {}",
-                                self.id, &operation.service
-                            )
-                        });
+                    if !service_stream.connect_n_send(message) {
+
+                    }
+
                     let mut reader =
                         BufReader::new(service_stream.try_clone().unwrap_or_else(|_| {
                             panic!("ALGLOBO <{}>: could not clone stream", self.id)
