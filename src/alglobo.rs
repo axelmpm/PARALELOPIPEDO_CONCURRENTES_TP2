@@ -231,7 +231,7 @@ impl Alglobo {
                     let mut service_stream = entry.1.clone();
                     if !service_stream.connect_n_send(message) { //asume rejection
                         loglist.push(MessageKind::Rejection);
-                        return loglist;
+                        continue;
                     }
 
                     match entry.1.connect_n_recv() {
@@ -243,7 +243,7 @@ impl Alglobo {
                         },
                         None => { //asume rejection
                             loglist.push(MessageKind::Rejection);
-                            return loglist;
+                            continue;
                         }
                     }
                 }
