@@ -5,6 +5,7 @@ pub enum MessageKind {
     Confirmation,
     Rejection,
     Transaction,
+    Retry,
     Ack,
 }
 
@@ -13,6 +14,7 @@ pub fn decode(raw_message: String) -> MessageKind {
         "confirmation" => MessageKind::Confirmation,
         "rejection" => MessageKind::Rejection,
         "ack" => MessageKind::Ack,
+        "retry" => MessageKind::Retry,
         _ => MessageKind::Transaction,
     }
 }
@@ -22,6 +24,7 @@ pub fn encode(msg: MessageKind) -> String {
         MessageKind::Confirmation => "confirmation".to_string(),
         MessageKind::Rejection => "rejection".to_string(),
         MessageKind::Ack => "ack".to_string(),
+        MessageKind::Retry => "retry".to_string(),
         _ => "".to_string(),
     }
 }
@@ -36,6 +39,7 @@ impl fmt::Display for MessageKind {
                 MessageKind::Rejection => "rejection",
                 MessageKind::Transaction => "transaction",
                 MessageKind::Ack => "ack",
+                MessageKind::Retry => "retry"
             }
         )
     }

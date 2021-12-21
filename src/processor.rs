@@ -1,7 +1,6 @@
 use crate::message::Message;
 use crate::message_kind::MessageKind;
-use crate::pending_storage::PendingStorage;
-
+use std::collections::HashMap;
 extern crate rand;
 use crate::logger::Logger;
 use crate::processor::rand::Rng;
@@ -11,19 +10,19 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 pub struct Processor {
-    storage: Mutex<PendingStorage>,
     logger: Arc<Mutex<Logger>>,
+    results: HashMap<i32, Message>
 }
 
 impl Processor {
     pub fn new(logger: Arc<Mutex<Logger>>) -> Processor {
         Processor {
-            storage: Mutex::new(PendingStorage::new()),
             logger,
+            results: HashMap::new()
         }
     }
 
-    pub fn process(&self, message: Message, service: ServiceKind) -> Message {
+    pub fn process(&mut self, message: Message, service: ServiceKind) -> Message {
         match message.kind {
             // Esto sería equivalente a un COMMIT
             MessageKind::Confirmation => {
@@ -58,39 +57,56 @@ impl Processor {
                 thread::sleep(Duration::from_millis(
                     rand::thread_rng().gen_range(500..2000),
                 ));
-                let luck = rand::thread_rng().gen_range(0..10);
-                self.storage
-                    .lock()
-                    .unwrap_or_else(|_| panic!("PROCESSOR: couldnt adquiere lock"))
-                    .store(message.body.id.to_string());
-                if luck > 2 {
-                    //accepted
-                    //println!("PROCESSOR: message.body = {}", message.body);
-                    self.logger
-                        .lock()
-                        .unwrap_or_else(|_| panic!("PROCESSOR: couldnt adquiere lock"))
-                        .write_line(format!(
-                            "{} ACCEPTED {}",
-                            service.to_string(),
-                            message.body.id.to_string()
-                        ));
-                    Message::new(MessageKind::Confirmation, message.body)
-                } else {
-                    //rejected
-                    //println!("PROCESSOR: message.body = {}", message.body);
-                    self.logger
-                        .lock()
-                        .unwrap_or_else(|_| panic!("PROCESSOR: couldnt adquiere lock"))
-                        .write_line(format!(
-                            "{} REJECTED {}",
-                            service.to_string(),
-                            message.body.id.to_string()
-                        ));
-                    Message::new(MessageKind::Rejection, message.body)
-                }
+                
+
+                match self.results.get(&message.body.id) {
+                    Some(result) => result.clone(),
+                    None => {
+                        let id = message.body.id;
+                        let result = self.process_new_transaction(message, service);
+                        self.results.insert(id, result.clone());
+                        result
+                    }
+                }      
+            }
+
+            MessageKind::Retry => {
+                let result = self.process_new_transaction(message, service);
+                return result;
             }
 
             _ => Message::new(MessageKind::Rejection, message.body),
+        }
+
+
+    }
+    
+    fn process_new_transaction(&self, message: Message, service: ServiceKind) -> Message{
+        let luck = rand::thread_rng().gen_range(0..10);
+        if luck > 2 {
+            //accepted
+            //println!("PROCESSOR: message.body = {}", message.body);
+            self.logger
+                .lock()
+                .unwrap_or_else(|_| panic!("PROCESSOR: couldnt adquiere lock"))
+                .write_line(format!(
+                    "{} ACCEPTED {}",
+                    service.to_string(),
+                    message.body.id.to_string()
+                ));
+            Message::new(MessageKind::Confirmation, message.body)
+        } else {
+            //rejected
+            //println!("PROCESSOR: message.body = {}", message.body);
+            self.logger
+                .lock()
+                .unwrap_or_else(|_| panic!("PROCESSOR: couldnt adquiere lock"))
+                .write_line(format!(
+                    "{} REJECTED {}",
+                    service.to_string(),
+                    message.body.id.to_string()
+                ));
+            Message::new(MessageKind::Rejection, message.body)
         }
     }
 }

@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex};
 
 pub struct Service {
     kind: ServiceKind,
-    listener: TcpListener,
-    processor: Arc<Processor>,
+    processor: Processor,
+    address: String,
     _logger: Arc<Mutex<Logger>>,
 }
 
@@ -23,20 +23,23 @@ impl Service {
         let logger = Arc::new(Mutex::new(Logger::new(kind.to_string() + ".txt")));
         Service {
             kind,
-            listener: TcpListener::bind(address)
-                .unwrap_or_else(|_| panic!("SERVICE: {} couldn bind tcp conection", kind)),
-            processor: Arc::new(Processor::new(logger.clone())),
+            address: address,
+            processor: Processor::new(logger.clone()),
             _logger: logger,
         }
     }
 
-    pub fn run(&self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
+    pub fn run(&mut self, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
         println!("service started");
 
-        self.listener
-            .set_nonblocking(true)
-            .expect("Cannot set non-blocking");
-        for stream in self.listener.incoming() {
+        let listener = TcpListener::bind(self.address.clone())
+        .unwrap_or_else(|_| panic!("SERVICE: {} couldn bind tcp conection", self.kind));
+
+        listener
+        .set_nonblocking(true)
+        .expect("Cannot set non-blocking");
+
+        for stream in listener.incoming() {
             match stream {
                 Ok(stream) => self.handle_connection(stream, ctrlc_event.clone()),
                 Err(ref e) if e.kind() == WouldBlock => {
@@ -56,7 +59,7 @@ impl Service {
         }
     }
 
-    fn handle_connection(&self, mut stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
+    fn handle_connection(&mut self, mut stream: TcpStream, ctrlc_event: Arc<Mutex<Receiver<()>>>) {
         //println!("new connection");
 
         stream

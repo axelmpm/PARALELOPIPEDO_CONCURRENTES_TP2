@@ -3,6 +3,7 @@ use crate::message_kind::decode;
 use crate::message_kind::MessageKind;
 use std::fmt;
 
+#[derive(Copy, Clone)]
 pub struct Message {
     pub kind: MessageKind,
     pub body: MessageBody, //quizas?
